@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  merge_group:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (PR pushes, force-pushes, rapid main
+# commits). The release workflow opts out of this — see release.yml.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+# Default to no permissions; each job opts in to whatever it actually needs.
+# Limits the blast radius if a step (or a transitively-pulled action) is ever
+# compromised — without this, jobs inherit the org/repo default which is
+# usually contents:write and can push tags, labels, releases, etc.
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  # sccache silently no-ops when CARGO_INCREMENTAL=1 (its default). Force
+  # it off so the dev-profile builds actually route through sccache.
+  CARGO_INCREMENTAL: "0"
+  # Selects [profile.ci] from Cargo.toml for the just recipes — disables
+  # incremental, bumps deps to opt-level=3, strips debuginfo.
+  PROFILE: "ci"
+
+jobs:
+  lint:
+    name: Format + clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup environment
+        uses: $/.github/actions/setup-env
+
+      - name: Run rustfmt + clippy
+        run: just lint
+
+  test:
+    name: Unit and mock tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup environment
+        uses: $/.github/actions/setup-env
+
+      - name: Run tests
+        run: just test
+
+  test-pg:
+    name: Store conformance on PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: authz
+          POSTGRES_PASSWORD: authz
+          POSTGRES_DB: authz
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U authz"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://authz:authz@localhost:5432/authz
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup environment
+        uses: $/.github/actions/setup-env
+
+      - name: Run the store conformance suite
+        run: just test-pg
+
+  integration:
+    name: lakeFS + ferriskey integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup environment
+        uses: $/.github/actions/setup-env
+
+      - name: Pre-pull images
+        run: |
+          docker pull treeverse/lakefs:1.86.0
+          docker pull postgres:17-alpine
+          docker pull postgres:18.2
+          docker pull ghcr.io/ferriskey/ferriskey-api:0.7.2
+
+      - name: Run the container-backed tests
+        run: just test-docker

@@ -1,0 +1,116 @@
+suite: lakefs-authn wiring
+templates:
+  - templates/authn-deployment.yaml
+  - templates/authn-ingress.yaml
+values:
+  - ./values/base.yaml
+release:
+  name: lakefs-auth
+  namespace: lakefs
+tests:
+  - it: points at the in-cluster lakefs-authz Service by default
+    asserts:
+      - template: templates/authn-deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHN_AUTHZ_URL
+            value: http://lakefs-authz.lakefs.svc:8002/api/v1
+
+  - it: honours an explicit authz URL and the optional settings
+    set:
+      authn.authzUrl: http://authz.other:8002/api/v1
+      authn.groupsClaim: groups
+      authn.sessionTtl: 24h
+      authn.rpInitiatedLogout: true
+    asserts:
+      - template: templates/authn-deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHN_AUTHZ_URL
+            value: http://authz.other:8002/api/v1
+      - template: templates/authn-deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHN_GROUPS_CLAIM
+            value: groups
+      - template: templates/authn-deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHN_SESSION_TTL
+            value: 24h
+      - template: templates/authn-deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHN_RP_INITIATED_LOGOUT
+            value: "true"
+
+  - it: fails without the public URL
+    set:
+      authn.publicUrl: ""
+    asserts:
+      - template: templates/authn-deployment.yaml
+        failedTemplate:
+          errorPattern: authn.publicUrl is required
+
+  - it: fails without the issuer
+    set:
+      authn.oidc.issuer: ""
+    asserts:
+      - template: templates/authn-deployment.yaml
+        failedTemplate:
+          errorPattern: authn.oidc.issuer is required
+
+  - it: omits the Ingress by default
+    asserts:
+      - template: templates/authn-ingress.yaml
+        hasDocuments:
+          count: 0
+
+  - it: routes the /oidc prefix of the lakeFS host to the Service when enabled
+    set:
+      authn.ingress.enabled: true
+      authn.ingress.host: lakefs.example.com
+      authn.ingress.className: nginx
+      authn.ingress.tls.enabled: true
+      authn.ingress.tls.secretName: lakefs-tls
+    asserts:
+      - template: templates/authn-ingress.yaml
+        hasDocuments:
+          count: 1
+      - template: templates/authn-ingress.yaml
+        equal:
+          path: spec.rules[0].host
+          value: lakefs.example.com
+      - template: templates/authn-ingress.yaml
+        equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /oidc
+      - template: templates/authn-ingress.yaml
+        equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: lakefs-authn
+      - template: templates/authn-ingress.yaml
+        equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 8001
+      - template: templates/authn-ingress.yaml
+        equal:
+          path: spec.ingressClassName
+          value: nginx
+      - template: templates/authn-ingress.yaml
+        equal:
+          path: spec.tls[0].secretName
+          value: lakefs-tls
+
+  - it: fails when the Ingress has no host
+    set:
+      authn.ingress.enabled: true
+    asserts:
+      - template: templates/authn-ingress.yaml
+        failedTemplate:
+          errorPattern: authn.ingress.host is required

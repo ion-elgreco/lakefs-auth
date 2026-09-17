@@ -1,0 +1,53 @@
+suite: lakefs-authz bootstrap file
+templates:
+  - templates/authz-deployment.yaml
+  - templates/authz-bootstrap-configmap.yaml
+values:
+  - ./values/base.yaml
+release:
+  name: lakefs-auth
+  namespace: lakefs
+tests:
+  - it: has no bootstrap file by default
+    asserts:
+      - template: templates/authz-bootstrap-configmap.yaml
+        hasDocuments:
+          count: 0
+      - template: templates/authz-deployment.yaml
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHZ_BOOTSTRAP_FILE
+          any: true
+      - template: templates/authz-deployment.yaml
+        isNull:
+          path: spec.template.spec.volumes
+
+  - it: mounts the bootstrap file from a ConfigMap when set
+    set:
+      authz.bootstrap: |
+        version: 1
+        groups:
+          - id: readers
+    asserts:
+      - template: templates/authz-bootstrap-configmap.yaml
+        hasDocuments:
+          count: 1
+      - template: templates/authz-bootstrap-configmap.yaml
+        matchRegex:
+          path: data["bootstrap.yaml"]
+          pattern: "id: readers"
+      - template: templates/authz-deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHZ_BOOTSTRAP_FILE
+            value: /etc/lakefs-authz/bootstrap.yaml
+      - template: templates/authz-deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[0].configMap.name
+          value: lakefs-authz-bootstrap
+      - template: templates/authz-deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /etc/lakefs-authz

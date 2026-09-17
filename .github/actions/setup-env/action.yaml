@@ -1,0 +1,76 @@
+name: "Setup Rust environment"
+description: "Set up just, the Rust toolchain from rust-toolchain.toml, the compile caches, and optionally the cross-compile linker"
+
+inputs:
+  cache:
+    description: "Enable the compile caches (rust-cache via setup-rust-toolchain, plus sccache). Release workflows set this to 'false'."
+    required: false
+    default: "true"
+
+  rust-cache:
+    description: "Enable the Rust compile caches (rust-cache + sccache). Jobs that run no cargo build set this to 'false' so they can't save an empty tarball under the shared cache key."
+    required: false
+    default: "true"
+
+  cache-shared-key:
+    description: "rust-cache shared key. Jobs whose target contents don't overlap the default pool set their own so they keep a dedicated primer tarball instead of racing the shared one."
+    required: false
+    default: "ci"
+
+  cross_compile:
+    description: "Install the cross-compile toolchain (cargo-zigbuild + zig as the cross linker). Release workflows that produce linux/amd64 + linux/arm64 artifacts from a single runner set this to 'true'."
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+
+  # Third-party actions are pinned to full commit SHAs (not floating tags), so a
+  # compromised maintainer can't ship malicious code to our CI by force-pushing
+  # the tag. Comment after the SHA records the human-readable version we
+  # originally selected. Bumping = update both.
+
+  steps:
+    # setup just command runner: the justfile holds every build and test command
+    - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+      with:
+        just-version: "1.51.0"
+
+    # setup sccache for cache compilation — skipped when cache is disabled
+    # so we don't pay the install cost in release builds that won't use it.
+    - name: Setup sccache
+      if: inputs.cache == 'true' && inputs.rust-cache == 'true'
+      uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
+
+    - name: Setup Rust toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@2b1f5e9b395427c92ee4e3331786ca3c37afe2d7 # v1.16.0
+      with:
+        # Empty: install the version pinned in rust-toolchain.toml.
+        toolchain: ""
+        cache: ${{ inputs.cache == 'true' && inputs.rust-cache == 'true' }}
+        # One cache per OS/arch shared by every job on the same key (drops the per-job key)
+        cache-shared-key: ${{ inputs.cache-shared-key }}
+        # PRs restore main's cache but never save their own copies
+        cache-save-if: ${{ github.ref == 'refs/heads/main' }}
+        # Save partial compilation
+        cache-on-failure: "true"
+        rustflags: "-D warnings"
+
+    # Cross-compile linker (cargo-zigbuild + zig) — only release
+    # workflows opt into this.
+    - name: Install cargo-zigbuild
+      if: inputs.cross_compile == 'true'
+      uses: taiki-e/install-action@f44ba2d13a74f48f97453869ad3244dae85c883c # main @ 2026-05-11
+      with:
+        tool: cargo-zigbuild@0.23.4
+
+    - name: Install zig
+      if: inputs.cross_compile == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Pinned — zig releases change bundled-clang behavior.
+        pipx install 'ziglang==0.16.0'
+        # ziglang ≥0.14 renamed its console script to `python-zig`;
+        # cargo-zigbuild discovers the linker as `zig` on PATH.
+        ln -sf "$(command -v python-zig)" "$HOME/.local/bin/zig"

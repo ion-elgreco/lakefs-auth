@@ -1,0 +1,95 @@
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "MIT"
+repository = "https://github.com/ion-elgreco/lakefs-auth"
+
+[workspace.dependencies]
+# web
+axum = { version = "0.8", features = ["macros"] }
+axum-extra = { version = "0.12", features = ["cookie", "cookie-private"] }
+tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.7", features = ["trace", "request-id", "timeout", "limit", "cors", "util"] }
+http = "1"
+http-body-util = "0.1"
+bytes = "1"
+# http client (pinned to 0.12: openidconnect 4 -> oauth2 5 -> reqwest 0.12)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "cookies"] }
+openidconnect = { version = "4", default-features = false, features = ["reqwest", "rustls-tls"] }
+# database
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-rustls-aws-lc-rs", "postgres", "migrate", "uuid", "macros", "derive", "json"] }
+# serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde-saphyr = "1"
+serde_urlencoded = "0.7"
+# security
+jsonwebtoken = { version = "11", features = ["rust_crypto"] }
+# `zeroize` wipes the expanded round keys when a cipher is dropped
+aes-gcm = { version = "0.10", features = ["zeroize"] }
+hkdf = "0.12"
+hmac = "0.12"
+sha2 = "0.10"
+subtle = "2"
+rand = "0.10"
+zeroize = "1"
+base64 = "0.22"
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
+# time: only UTC instants are needed, so no time zone database is compiled in
+jiff = { version = "0.2", default-features = false, features = ["std"] }
+jiff-sqlx = { version = "0.2", features = ["postgres"] }
+percent-encoding = "2"
+# operations
+prometheus = { version = "0.14", default-features = false }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+clap = { version = "4", features = ["derive", "env"] }
+humantime = "2"
+thiserror = "2"
+anyhow = "1"
+url = { version = "2", features = ["serde"] }
+async-trait = "0.1"
+futures = "0.3"
+# tests
+testcontainers = "0.27"
+testcontainers-modules = { version = "0.15", features = ["postgres"] }
+wiremock = "0.6"
+pretty_assertions = "1"
+# cookie jar types, kept on the same version axum-extra 0.12 uses
+cookie = "0.18"
+
+# Release binaries: link-time optimisation, one codegen unit, symbols stripped.
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
+opt-level = "s"
+
+# CI profile — fast cold-start builds with cache-friendly artifacts.
+# Inherits dev so workspace crates compile cheaply, but disables
+# incremental so sccache (which silently no-ops with CARGO_INCREMENTAL=1)
+# can actually populate the cache. Dependencies are built at opt-level=3
+# with debuginfo stripped so the cached `target/` blob stays small and
+# tests run at near-release speed. Selected via `PROFILE=ci` in CI.
+[profile.ci]
+inherits = "dev"
+debug = false
+incremental = false
+
+[profile.ci.package."*"]
+opt-level = 3
+debug = false
+debug-assertions = false
+strip = "debuginfo"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

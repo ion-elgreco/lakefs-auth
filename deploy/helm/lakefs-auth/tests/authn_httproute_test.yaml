@@ -1,0 +1,114 @@
+suite: lakefs-authn HTTPRoute
+templates:
+  - templates/authn-httproute.yaml
+values:
+  - ./values/base.yaml
+release:
+  name: lakefs-auth
+  namespace: lakefs
+tests:
+  - it: omits the HTTPRoute by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: omits the HTTPRoute when authn is disabled even if httpRoute is enabled
+    set:
+      authn.enabled: false
+      authn.httpRoute.enabled: true
+      authn.httpRoute.parentRefs:
+        - name: public
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails without parentRefs
+    set:
+      authn.httpRoute.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: authn.httpRoute.parentRefs is required
+
+  - it: routes the /oidc prefix to the Service with the default rule
+    set:
+      authn.httpRoute.enabled: true
+      authn.httpRoute.parentRefs:
+        - name: public
+          namespace: gateway-system
+      authn.httpRoute.hostnames:
+        - lakefs.example.com
+      authn.httpRoute.annotations:
+        example.com/owner: platform
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: HTTPRoute
+      - equal:
+          path: apiVersion
+          value: gateway.networking.k8s.io/v1
+      - equal:
+          path: metadata.name
+          value: lakefs-authn
+      - equal:
+          path: metadata.annotations["example.com/owner"]
+          value: platform
+      - equal:
+          path: spec.parentRefs[0].name
+          value: public
+      - equal:
+          path: spec.parentRefs[0].namespace
+          value: gateway-system
+      - equal:
+          path: spec.hostnames[0]
+          value: lakefs.example.com
+      - equal:
+          path: spec.rules[0].matches[0].path.type
+          value: PathPrefix
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /oidc
+      - equal:
+          path: spec.rules[0].backendRefs[0].name
+          value: lakefs-authn
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 8001
+      - equal:
+          path: spec.rules[0].backendRefs[0].weight
+          value: 1
+
+  - it: renders custom rules with matches and filters
+    set:
+      authn.httpRoute.enabled: true
+      authn.httpRoute.parentRefs:
+        - name: public
+      authn.httpRoute.rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /sso
+          filters:
+            - type: URLRewrite
+              urlRewrite:
+                path:
+                  type: ReplacePrefixMatch
+                  replacePrefixMatch: /oidc
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /oidc
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /sso
+      - equal:
+          path: spec.rules[0].filters[0].type
+          value: URLRewrite
+      - equal:
+          path: spec.rules[1].matches[0].path.value
+          value: /oidc
+      - equal:
+          path: spec.rules[1].backendRefs[0].name
+          value: lakefs-authn

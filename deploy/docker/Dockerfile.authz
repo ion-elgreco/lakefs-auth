@@ -1,0 +1,42 @@
+# Packages a prebuilt lakefs-authz Linux binary into a distroless image.
+# The build context is a staging directory that holds only the binary;
+# `just build-images` and .github/workflows/release.yml produce it.
+ARG BUILDER_IMAGE=debian:bookworm-slim
+ARG BASE_IMAGE=gcr.io/distroless/cc-debian12:nonroot
+
+FROM ${BUILDER_IMAGE} AS prep
+COPY lakefs-authz /staging/usr/local/bin/lakefs-authz
+RUN set -eux; \
+    chmod 0755 /staging/usr/local/bin/lakefs-authz
+
+FROM ${BASE_IMAGE}
+
+# Names without AUTH in them: BuildKit's SecretsUsedInArgOrEnv check flags that word.
+ARG VERSION=dev
+ARG REVISION=unknown
+ARG BUILD_DATE=unknown
+ARG BASE_IMAGE
+
+LABEL org.opencontainers.image.title="lakefs-authz" \
+      org.opencontainers.image.description="lakeFS authorization server: users, groups, policies and credentials on PostgreSQL" \
+      org.opencontainers.image.vendor="lakefs-auth" \
+      org.opencontainers.image.authors="Ion Koutsouris" \
+      org.opencontainers.image.source="https://github.com/ion-elgreco/lakefs-auth" \
+      org.opencontainers.image.url="https://github.com/ion-elgreco/lakefs-auth" \
+      org.opencontainers.image.documentation="https://github.com/ion-elgreco/lakefs-auth" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.base.name="${BASE_IMAGE}"
+
+COPY --from=prep /staging/ /
+
+USER 65532:65532
+WORKDIR /home/nonroot
+
+EXPOSE 8002
+
+STOPSIGNAL SIGTERM
+
+ENTRYPOINT ["/usr/local/bin/lakefs-authz"]

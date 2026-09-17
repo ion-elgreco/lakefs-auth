@@ -1,0 +1,112 @@
+{{- if .Values.authz.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lakefs-authz
+  labels:
+    app.kubernetes.io/name: lakefs-authz
+    {{- include "lakefs-auth.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.authz.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lakefs-authz
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lakefs-authz
+        {{- include "lakefs-auth.labels" . | nindent 8 }}
+      {{- with .Values.authz.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "lakefs-auth.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: lakefs-authz
+          image: {{ include "lakefs-auth.authzImage" . | quote }}
+          imagePullPolicy: {{ .Values.authz.imagePullPolicy }}
+          securityContext:
+            {{- include "lakefs-auth.containerSecurityContext" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.authz.port }}
+            {{- if .Values.authz.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.authz.metrics.port }}
+            {{- end }}
+          env:
+            - name: LAKEFS_AUTHZ_LISTEN
+              value: "0.0.0.0:{{ .Values.authz.port }}"
+            {{- if .Values.authz.metrics.enabled }}
+            - name: LAKEFS_AUTHZ_METRICS_LISTEN
+              value: "0.0.0.0:{{ .Values.authz.metrics.port }}"
+            {{- end }}
+            - name: LAKEFS_AUTHZ_BASE_PATH
+              value: {{ .Values.authz.basePath | quote }}
+            - name: LAKEFS_AUTHZ_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lakefs-auth.sharedSecretName" . }}
+                  key: {{ .Values.sharedSecret.secretKey | quote }}
+            - name: LAKEFS_AUTHZ_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lakefs-auth.databaseSecretName" . }}
+                  key: {{ .Values.authz.database.secretKey | quote }}
+            {{- with .Values.authz.encryptionKey.existingSecret }}
+            - name: LAKEFS_AUTHZ_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.authz.encryptionKey.secretKey | quote }}
+            {{- end }}
+            {{- with .Values.authz.apiToken.existingSecret }}
+            - name: LAKEFS_AUTHZ_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.authz.apiToken.secretKey | quote }}
+            {{- end }}
+            - name: LAKEFS_AUTHZ_RUN_MIGRATIONS
+              value: {{ .Values.authz.runMigrations | quote }}
+            {{- if .Values.authz.bootstrap }}
+            - name: LAKEFS_AUTHZ_BOOTSTRAP_FILE
+              value: /etc/lakefs-authz/bootstrap.yaml
+            {{- end }}
+            - name: LAKEFS_AUTHZ_LOG_LEVEL
+              value: {{ .Values.authz.logLevel | quote }}
+            - name: LAKEFS_AUTHZ_LOG_FORMAT
+              value: {{ .Values.authz.logFormat | quote }}
+            {{- with .Values.authz.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.authz.basePath }}/healthcheck
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.authz.resources | nindent 12 }}
+          {{- if .Values.authz.bootstrap }}
+          volumeMounts:
+            - name: bootstrap
+              mountPath: /etc/lakefs-authz
+              readOnly: true
+          {{- end }}
+      {{- if .Values.authz.bootstrap }}
+      volumes:
+        - name: bootstrap
+          configMap:
+            name: lakefs-authz-bootstrap
+      {{- end }}
+{{- end }}

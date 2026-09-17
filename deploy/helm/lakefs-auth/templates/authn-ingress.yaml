@@ -1,0 +1,39 @@
+{{- if and .Values.authn.enabled .Values.authn.ingress.enabled }}
+{{- $host := required "authn.ingress.host is required when authn.ingress.enabled is true: the DNS name of lakeFS" .Values.authn.ingress.host }}
+{{- $tls := .Values.authn.ingress.tls }}
+{{- if and $tls.enabled (not $tls.secretName) }}
+{{ fail "authn.ingress.tls.secretName is required when authn.ingress.tls.enabled is true" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lakefs-authn
+  labels:
+    app.kubernetes.io/name: lakefs-authn
+    {{- include "lakefs-auth.labels" . | nindent 4 }}
+  {{- with .Values.authn.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.authn.ingress.className }}
+  ingressClassName: {{ . | quote }}
+  {{- end }}
+  {{- if $tls.enabled }}
+  tls:
+    - hosts:
+        - {{ $host | quote }}
+      secretName: {{ $tls.secretName | quote }}
+  {{- end }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: {{ .Values.authn.ingress.path | quote }}
+            pathType: {{ .Values.authn.ingress.pathType | quote }}
+            backend:
+              service:
+                name: lakefs-authn
+                port:
+                  number: {{ .Values.authn.port }}
+{{- end }}

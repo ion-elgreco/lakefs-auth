@@ -1,0 +1,12 @@
+{{- if and .Values.authz.enabled .Values.authz.bootstrap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lakefs-authz-bootstrap
+  labels:
+    app.kubernetes.io/name: lakefs-authz
+    {{- include "lakefs-auth.labels" . | nindent 4 }}
+data:
+  bootstrap.yaml: |
+    {{- .Values.authz.bootstrap | nindent 4 }}
+{{- end }}

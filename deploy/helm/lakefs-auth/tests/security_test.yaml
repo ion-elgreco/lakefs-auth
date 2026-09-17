@@ -1,0 +1,33 @@
+suite: hardened pods
+templates:
+  - templates/authz-deployment.yaml
+  - templates/authn-deployment.yaml
+values:
+  - ./values/base.yaml
+release:
+  name: lakefs-auth
+  namespace: lakefs
+tests:
+  - it: runs as the distroless nonroot user with a read-only filesystem and no capabilities
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 65532
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop[0]
+          value: ALL
