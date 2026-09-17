@@ -1949,7 +1949,7 @@ dependencies = [
  "anyhow",
  "axum",
  "base64 0.22.1",
- "hkdf 0.12.4",
+ "hkdf 0.13.0",
  "http",
  "humantime",
  "jiff",
