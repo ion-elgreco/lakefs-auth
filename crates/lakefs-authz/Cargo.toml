@@ -1,0 +1,66 @@
+[package]
+name = "lakefs-authz"
+description = "lakeFS authorization server: users, groups, policies and credentials on PostgreSQL"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+# In-memory store and the shared store conformance suite, used by the tests here
+# and by the full-stack test in lakefs-authn. Off by default, so the release
+# binary and the image carry no store that forgets everything on restart.
+testkit = []
+# Runs the store conformance suite against a PostgreSQL container.
+pg-tests = []
+
+[[bin]]
+name = "lakefs-authz"
+path = "src/main.rs"
+
+[lib]
+name = "lakefs_authz"
+path = "src/lib.rs"
+
+[dependencies]
+lakefs-auth-core = { path = "../lakefs-auth-core", features = ["server", "jwt", "crypto"] }
+axum = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+http = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-saphyr = { workspace = true }
+async-trait = { workspace = true }
+jiff = { workspace = true }
+jiff-sqlx = { workspace = true }
+clap = { workspace = true }
+humantime = { workspace = true }
+prometheus = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+reqwest = { workspace = true }
+
+[dev-dependencies]
+# The crate's own tests need the in-memory store, which the release build leaves out.
+lakefs-authz = { path = ".", features = ["testkit"] }
+lakefs-authz-client = { path = "../lakefs-authz-client" }
+http-body-util = { workspace = true }
+bytes = { workspace = true }
+pretty_assertions = { workspace = true }
+testcontainers = { workspace = true }
+testcontainers-modules = { workspace = true }
+serde_urlencoded = { workspace = true }
+uuid = { workspace = true }
+base64 = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
+
+[build-dependencies]
+
+[lints]
+workspace = true

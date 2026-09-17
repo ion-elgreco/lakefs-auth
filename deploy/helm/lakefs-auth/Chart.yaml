@@ -1,0 +1,11 @@
+apiVersion: v2
+name: lakefs-auth
+description: lakefs-authn and lakefs-authz, the OIDC login and RBAC store servers for open-source lakeFS
+type: application
+version: 0.0.0-dev
+appVersion: "0.0.0-dev"
+home: https://ion-elgreco.github.io/lakefs-auth/
+sources:
+  - https://github.com/ion-elgreco/lakefs-auth
+maintainers:
+  - name: Ion Koutsouris

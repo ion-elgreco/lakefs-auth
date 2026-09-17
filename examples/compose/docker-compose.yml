@@ -1,0 +1,272 @@
+# Local demo: lakeFS + lakefs-authz + lakefs-authn + ferriskey (OIDC provider) + RustFS (S3 store).
+#
+# Run `just demo-up` from the repository root: it builds the lakefs-authn and
+# lakefs-authz images and then runs `docker compose up -d`. Two jobs run on every
+# start and both are idempotent. The bootstrap job creates the ferriskey realm,
+# client, and user, and hands the client secret to lakefs-authn through a shared
+# volume. The lakefs-setup job creates the RustFS bucket and the lakeFS repository
+# with the installation credentials. So `docker compose down -v` followed by a plain
+# `up` works. Then open http://localhost:8000 and use "Sign in with SSO" with
+# either "admin" / "admin", which lands in the lakeFS Admins group, or
+# "user" / "user", which lands in Developers.
+#
+# Networking note: browsers share cookies across ports on the same host, so
+# lakeFS (8000) and lakefs-authn (8001) both live on localhost. lakefs-authn
+# shares the network namespace of ferriskey-api so that the OIDC issuer is
+# http://localhost:3333/realms/lakefs for the browser and for the server alike.
+
+services:
+  authz-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: authz
+      POSTGRES_PASSWORD: authz
+      POSTGRES_DB: authz
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ferriskey-db:
+    image: postgres:18.2
+    environment:
+      POSTGRES_USER: ferriskey
+      POSTGRES_PASSWORD: ferriskey
+      POSTGRES_DB: ferriskey
+      PGUSER: ferriskey
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d ferriskey"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ferriskey-migrate:
+    image: ghcr.io/ferriskey/ferriskey-api:0.7.2
+    entrypoint: ["sqlx"]
+    command: ["migrate", "run", "--source", "/usr/local/src/ferriskey/migrations"]
+    environment:
+      DATABASE_URL: postgresql://ferriskey:ferriskey@ferriskey-db/ferriskey
+    restart: "no"
+    depends_on:
+      ferriskey-db:
+        condition: service_healthy
+
+  ferriskey-api:
+    image: ghcr.io/ferriskey/ferriskey-api:0.7.2
+    environment:
+      DATABASE_HOST: ferriskey-db
+      DATABASE_NAME: ferriskey
+      DATABASE_USER: ferriskey
+      DATABASE_PASSWORD: ferriskey
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin
+      ADMIN_EMAIL: admin@local
+      ALLOWED_ORIGINS: http://localhost:5555
+      WEBAPP_URL: http://localhost:5555
+    ports:
+      - "3333:3333"   # ferriskey API and OIDC endpoints
+      - "8001:8001"   # lakefs-authn (shares this network namespace)
+      - "9092:9092"   # lakefs-authn Prometheus metrics
+    depends_on:
+      ferriskey-migrate:
+        condition: service_completed_successfully
+
+  ferriskey-webapp:
+    image: ghcr.io/ferriskey/ferriskey-webapp:0.7.2
+    environment:
+      API_URL: http://localhost:3333
+    ports:
+      - "5555:80"
+
+  # Creates the ferriskey realm, client, and demo user on every start and hands the
+  # client secret to lakefs-authn through the oidc-secret volume. Idempotent.
+  bootstrap:
+    image: python:3.12-alpine
+    command: ["python", "/bootstrap/bootstrap.py"]
+    environment:
+      IDP_URL: http://ferriskey-api:3333
+      REALM: lakefs
+      CLIENT_ID: lakefs
+      DEMO_USER: user
+      DEMO_PASSWORD: user
+      AUTHN_PUBLIC_URL: http://localhost:8001
+      LAKEFS_URL: http://localhost:8000
+      SECRET_FILE: /secrets/oidc_client_secret
+    volumes:
+      - ./bootstrap.py:/bootstrap/bootstrap.py:ro
+      - oidc-secret:/secrets
+    restart: "no"
+    depends_on:
+      ferriskey-api:
+        condition: service_started
+
+  # lakefs-authz and lakefs-authn run from the distroless images that
+  # `just build-images` builds. The images have no shell and run as UID 65532,
+  # so both services also run with a read-only root filesystem and no capabilities.
+  authz:
+    image: ${LAKEFS_AUTHZ_IMAGE:-lakefs-authz:dev}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      LAKEFS_AUTHZ_LISTEN: 0.0.0.0:8002
+      LAKEFS_AUTHZ_SECRET_KEY: ${SHARED_SECRET:-change-me-shared-secret}
+      LAKEFS_AUTHZ_DATABASE_URL: postgres://authz:authz@authz-db:5432/authz
+      LAKEFS_AUTHZ_METRICS_LISTEN: 0.0.0.0:9091
+      # Policy builder. It holds no credential: it forwards the lakeFS session
+      # cookie of whoever opens it, so lakeFS applies that person's policies.
+      # Cookies ignore the port, so a browser signed in to lakeFS on
+      # localhost:8000 also sends its cookie to the builder on localhost:8080.
+      LAKEFS_AUTHZ_BUILDER_LISTEN: 0.0.0.0:8080
+      LAKEFS_AUTHZ_LAKEFS_ENDPOINT: http://lakefs:8000/api/v1
+      LAKEFS_AUTHZ_LOG_LEVEL: info
+    ports:
+      - "8002:8002"
+      - "8080:8080"   # policy builder
+      - "9091:9091"   # Prometheus metrics
+    depends_on:
+      authz-db:
+        condition: service_healthy
+
+  authn:
+    image: ${LAKEFS_AUTHN_IMAGE:-lakefs-authn:dev}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    network_mode: "service:ferriskey-api"
+    environment:
+      LAKEFS_AUTHN_LISTEN: 0.0.0.0:8001
+      LAKEFS_AUTHN_SECRET_KEY: ${SHARED_SECRET:-change-me-shared-secret}
+      LAKEFS_AUTHN_PUBLIC_URL: http://localhost:8001
+      LAKEFS_AUTHN_OIDC_ISSUER: http://localhost:3333/realms/lakefs
+      LAKEFS_AUTHN_OIDC_CLIENT_ID: lakefs
+      LAKEFS_AUTHN_OIDC_CLIENT_SECRET_FILE: /secrets/oidc_client_secret
+      LAKEFS_AUTHN_AUTHZ_URL: http://authz:8002/api/v1
+      LAKEFS_AUTHN_INITIAL_GROUPS: Developers
+      # SDK (STS) logins are refused until the redirect URIs of the SDK clients
+      # are listed. A loopback entry without a port matches any port, for example:
+      # LAKEFS_AUTHN_STS_ALLOWED_REDIRECT_URIS: http://127.0.0.1/callback
+      # Put the demo identities into different lakeFS groups. ferriskey nests its
+      # realm roles under realm_access.roles, which this server reads only as a
+      # flat claim, so the demo maps the username claim instead. A real provider
+      # emits a flat groups claim and you map that.
+      LAKEFS_AUTHN_GROUPS_CLAIM: preferred_username
+      LAKEFS_AUTHN_GROUP_MAP: admin=Admins,user=Developers
+      LAKEFS_AUTHN_POST_LOGIN_REDIRECT_URL: http://localhost:8000/
+      LAKEFS_AUTHN_POST_LOGOUT_REDIRECT_URL: http://localhost:8000/auth/login
+      LAKEFS_AUTHN_METRICS_LISTEN: 0.0.0.0:9092
+      LAKEFS_AUTHN_LOG_LEVEL: info
+    volumes:
+      - oidc-secret:/secrets:ro
+    restart: unless-stopped
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      ferriskey-api:
+        condition: service_started
+      authz:
+        condition: service_started
+
+  # S3 object store for the lakeFS repository data. One volume is enough for a
+  # demo, so the erasure coding disk check is off; a real deployment uses four.
+  rustfs:
+    image: rustfs/rustfs:1.0.0-rc.6
+    security_opt: [no-new-privileges:true]
+    environment:
+      RUSTFS_VOLUMES: /data/rustfs0
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+      RUSTFS_UNSAFE_BYPASS_DISK_CHECK: "true"
+      RUSTFS_OBS_LOGGER_LEVEL: warn
+    ports:
+      - "9000:9000"   # S3 API
+    volumes:
+      # Mounted at /data, which the image owns as UID 10001, so a fresh volume
+      # inherits that ownership. Mounting /data/rustfs0 directly would not.
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  lakefs:
+    image: treeverse/lakefs:1.86.0
+    # The config file carries only `ui.snippets`, which adds the policy builder
+    # link to the lakeFS UI. Every LAKEFS_* variable below still wins over it.
+    command: ["run", "--config", "/etc/lakefs/config.yaml"]
+    environment:
+      LAKEFS_DATABASE_TYPE: local
+      LAKEFS_DATABASE_LOCAL_PATH: /home/lakefs/metadata
+      LAKEFS_BLOCKSTORE_TYPE: s3
+      LAKEFS_BLOCKSTORE_S3_ENDPOINT: http://rustfs:9000
+      LAKEFS_BLOCKSTORE_S3_FORCE_PATH_STYLE: "true"
+      LAKEFS_BLOCKSTORE_S3_REGION: us-east-1
+      LAKEFS_BLOCKSTORE_S3_DISCOVER_BUCKET_REGION: "false"
+      LAKEFS_BLOCKSTORE_S3_CREDENTIALS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      LAKEFS_BLOCKSTORE_S3_CREDENTIALS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+      LAKEFS_AUTH_ENCRYPT_SECRET_KEY: ${SHARED_SECRET:-change-me-shared-secret}
+      LAKEFS_AUTH_API_ENDPOINT: http://authz:8002/api/v1
+      LAKEFS_AUTH_AUTHENTICATION_API_ENDPOINT: http://ferriskey-api:8001/api/v1
+      LAKEFS_AUTH_UI_CONFIG_RBAC: internal
+      LAKEFS_AUTH_API_HEALTH_CHECK_TIMEOUT: 120s
+      LAKEFS_AUTH_UI_CONFIG_FALLBACK_LOGIN_URL: http://localhost:8001/oidc/login
+      LAKEFS_AUTH_UI_CONFIG_FALLBACK_LOGIN_LABEL: Sign in with SSO
+      LAKEFS_AUTH_UI_CONFIG_LOGOUT_URL: http://localhost:8001/oidc/logout
+      LAKEFS_AUTH_UI_CONFIG_LOGIN_COOKIE_NAMES: internal_auth_session
+      # Renamed so the SSO identity "admin" can own that username: lakefs-authn
+      # refuses a login when the derived username belongs to another identity.
+      LAKEFS_INSTALLATION_USER_NAME: lakefs-installation
+      LAKEFS_INSTALLATION_ACCESS_KEY_ID: AKIAJADMINADMINADMIQ
+      LAKEFS_INSTALLATION_SECRET_ACCESS_KEY: ${LAKEFS_ADMIN_SECRET:-bGFrZWZzLWF1dGgtZGVtby1hZG1pbi1zZWNyZXQw}
+      # No telemetry, and no welcome page that asks for an email address and a country.
+      LAKEFS_STATS_ENABLED: "false"
+      LAKEFS_USAGE_REPORT_ENABLED: "false"
+      LAKEFS_EMAIL_SUBSCRIPTION_ENABLED: "false"
+      LAKEFS_LOGGING_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      - lakefs-data:/home/lakefs
+      - ./lakefs-config.yaml:/etc/lakefs/config.yaml:ro
+    restart: unless-stopped
+    depends_on:
+      authz:
+        condition: service_started
+      rustfs:
+        condition: service_healthy
+
+  # Creates the RustFS bucket and the lakeFS repository on every start, using the
+  # installation credentials of lakeFS over HTTP basic auth. Idempotent.
+  lakefs-setup:
+    image: python:3.12-alpine
+    command: ["python", "/setup/lakefs-setup.py"]
+    environment:
+      S3_ENDPOINT: http://rustfs:9000
+      S3_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-rustfsadmin}
+      S3_SECRET_KEY: ${RUSTFS_SECRET_KEY:-rustfsadmin}
+      S3_REGION: us-east-1
+      BUCKET: lakefs
+      LAKEFS_URL: http://lakefs:8000
+      LAKEFS_ACCESS_KEY: AKIAJADMINADMINADMIQ
+      LAKEFS_SECRET_KEY: ${LAKEFS_ADMIN_SECRET:-bGFrZWZzLWF1dGgtZGVtby1hZG1pbi1zZWNyZXQw}
+      REPOSITORY: demo
+      DEFAULT_BRANCH: main
+      SAMPLE_DATA: "true"
+    volumes:
+      - ./lakefs-setup.py:/setup/lakefs-setup.py:ro
+    restart: "no"
+    depends_on:
+      rustfs:
+        condition: service_healthy
+      lakefs:
+        condition: service_started
+
+volumes:
+  lakefs-data:
+  oidc-secret:
+  rustfs-data:

@@ -1,0 +1,147 @@
+# The lakeFS `auth.encrypt.secret_key`. lakeFS, lakefs-authz, and lakefs-authn must all use the same value.
+sharedSecret:
+  # Name of an existing Secret that holds the value under `secretKey` (recommended). The default key
+  # matches the lakeFS chart (`secretKeys.authEncryptSecretKey`), so one Secret can serve both charts.
+  existingSecret: ""
+  secretKey: auth_encrypt_secret_key
+  # Inline value for development. When set and `existingSecret` is empty, the chart creates the Secret
+  # `lakefs-auth-shared-secret` from it.
+  value: ""
+
+authz:
+  enabled: true
+  # Empty defaults to ghcr.io/ion-elgreco/lakefs-authz:{{ .Chart.AppVersion }}.
+  image: ""
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  port: 8002
+  # Path prefix of the API. lakeFS `auth.api.endpoint` must end with it.
+  basePath: /api/v1
+  database:
+    # Name of an existing Secret that holds the PostgreSQL connection string under `secretKey`.
+    existingSecret: ""
+    secretKey: database-url
+    # Inline connection string for development. When set and `existingSecret` is empty, the chart creates
+    # the Secret `lakefs-authz-database` from it.
+    url: ""
+  # Optional separate key for the encryption of stored access key secrets. Without it the shared secret
+  # is used, and a rotation of the shared secret makes stored secrets unreadable.
+  encryptionKey:
+    existingSecret: ""
+    secretKey: encryption-key
+  # Optional static bearer token, the same value as lakeFS `auth.api.token`.
+  apiToken:
+    existingSecret: ""
+    secretKey: api-token
+  runMigrations: true
+  # The bootstrap file itself, written inline as a YAML block: policies, groups, and users created at
+  # every start when missing. The chart puts it in the ConfigMap `lakefs-authz-bootstrap` and mounts it
+  # at /etc/lakefs-authz/bootstrap.yaml; it is not the name of a ConfigMap you made.
+  # Reference secrets through `secret_access_key_env` and add the variables under `extraEnv`.
+  bootstrap: ""
+  # Prometheus metrics on their own port. Off by default: turn it on and point a
+  # ServiceMonitor or a scrape config at the `metrics` port of the Service.
+  metrics:
+    enabled: false
+    port: 9090
+  logLevel: info
+  logFormat: json
+  # Extra environment variables for the container, in Kubernetes syntax.
+  extraEnv: []
+  podAnnotations: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+authn:
+  enabled: true
+  # Empty defaults to ghcr.io/ion-elgreco/lakefs-authn:{{ .Chart.AppVersion }}.
+  image: ""
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  port: 8001
+  # External base URL of lakeFS, for example https://lakefs.example.com. Required. The OIDC redirect URI
+  # is <publicUrl>/oidc/callback, so the `/oidc/` prefix of that host must reach this server.
+  publicUrl: ""
+  # URL of lakefs-authz including its base path. Empty defaults to the in-cluster Service of this chart.
+  authzUrl: ""
+  oidc:
+    # Issuer URL exactly as the provider advertises it. Required.
+    issuer: ""
+    # Client id registered at the provider. Required.
+    clientId: ""
+    clientSecret:
+      # Name of an existing Secret that holds the client secret under `secretKey`. Leave both the
+      # Secret and `value` empty for a public client.
+      existingSecret: ""
+      secretKey: client-secret
+      # Inline value for development. Creates the Secret `lakefs-authn-oidc` when set.
+      value: ""
+    scopes: openid,profile,email
+    # Claims that must match, as `key=value,key=value`, compared exactly against the flattened claim.
+    validateClaims: ""
+  # Allow list for the `redirect_uri` of the SDK (STS) login, comma separated. Empty refuses every SDK
+  # login. A loopback entry without a port, such as `http://127.0.0.1/callback`, matches any port.
+  stsAllowedRedirectUris: ""
+  # Create a lakeFS user at the first login of an unknown identity. With `false` only users that already
+  # exist can sign in, for example the ones the bootstrap file creates with their `external_id`.
+  autoProvision: true
+  # Groups a new user joins when no groups claim resolves. They must exist in lakefs-authz.
+  initialGroups: Developers
+  groupsClaim: ""
+  groupMap: ""
+  # Where the browser goes after login without a `next` parameter. Empty keeps the server default `/`.
+  postLoginRedirectUrl: ""
+  postLogoutRedirectUrl: ""
+  # Lifetime of the session cookie, for example 168h. Empty keeps the server default.
+  sessionTtl: ""
+  rpInitiatedLogout: false
+  # Prometheus metrics on their own port. Off by default: turn it on and point a
+  # ServiceMonitor or a scrape config at the `metrics` port of the Service.
+  metrics:
+    enabled: false
+    port: 9090
+  logLevel: info
+  logFormat: json
+  extraEnv: []
+  podAnnotations: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  # Routes the `/oidc` prefix of the lakeFS host to this server. lakeFS keeps its own Ingress for `/`.
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    # The lakeFS host name. Required when enabled.
+    host: ""
+    path: /oidc
+    pathType: Prefix
+    tls:
+      enabled: false
+      # Required when tls.enabled is true.
+      secretName: ""
+  # Gateway API alternative to the Ingress: an HTTPRoute that sends the `/oidc` prefix of the lakeFS
+  # hostname to this server. Attach it to your Gateway through `parentRefs`.
+  httpRoute:
+    enabled: false
+    annotations: {}
+    # Required when enabled: the Gateway to attach to, for example
+    # [{name: public, namespace: gateway-system}].
+    parentRefs: []
+    # The lakeFS host name, for example [lakefs.example.com]. Empty matches every hostname of the Gateway.
+    hostnames: []
+    # Every rule gets lakefs-authn as its backend. Keep the `/oidc` prefix; add `filters` when needed.
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /oidc

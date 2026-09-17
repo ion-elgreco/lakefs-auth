@@ -1,0 +1,27 @@
+[package]
+name = "lakefs-authz-client"
+description = "HTTP client for the lakeFS authorization API"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+lakefs-auth-core = { path = "../lakefs-auth-core", features = ["jwt"] }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+jiff = { workspace = true }
+wiremock = { workspace = true }
+pretty_assertions = { workspace = true }
+jsonwebtoken = { workspace = true }
+
+[lints]
+workspace = true

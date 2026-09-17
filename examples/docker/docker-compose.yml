@@ -1,0 +1,92 @@
+# lakeFS with lakefs-authz and lakefs-authn on one host. Settings come from .env; see .env.example.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: authz
+      POSTGRES_PASSWORD: ${AUTHZ_DB_PASSWORD}
+      POSTGRES_DB: authz
+    volumes:
+      - authz-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  authz:
+    image: ghcr.io/ion-elgreco/lakefs-authz:${LAKEFS_AUTH_VERSION}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      LAKEFS_AUTHZ_DATABASE_URL: postgres://authz:${AUTHZ_DB_PASSWORD}@postgres:5432/authz
+      LAKEFS_AUTHZ_SECRET_KEY: ${SHARED_SECRET}
+      LAKEFS_AUTHZ_LOG_FORMAT: json
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  authn:
+    image: ghcr.io/ion-elgreco/lakefs-authn:${LAKEFS_AUTH_VERSION}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      LAKEFS_AUTHN_SECRET_KEY: ${SHARED_SECRET}
+      LAKEFS_AUTHN_PUBLIC_URL: ${LAKEFS_URL}
+      LAKEFS_AUTHN_OIDC_ISSUER: ${OIDC_ISSUER}
+      LAKEFS_AUTHN_OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      LAKEFS_AUTHN_OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      LAKEFS_AUTHN_AUTHZ_URL: http://authz:8002/api/v1
+      LAKEFS_AUTHN_POST_LOGIN_REDIRECT_URL: ${LAKEFS_URL}/
+      LAKEFS_AUTHN_LOG_FORMAT: json
+    ports:
+      - "127.0.0.1:8001:8001"   # health checks from the host only
+    depends_on:
+      - authz
+    restart: unless-stopped
+
+  lakefs:
+    image: treeverse/lakefs:${LAKEFS_VERSION}
+    command: ["run"]
+    environment:
+      LAKEFS_DATABASE_TYPE: local
+      LAKEFS_DATABASE_LOCAL_PATH: /home/lakefs/metadata
+      LAKEFS_BLOCKSTORE_TYPE: local
+      LAKEFS_BLOCKSTORE_LOCAL_PATH: /home/lakefs/data
+      LAKEFS_AUTH_ENCRYPT_SECRET_KEY: ${SHARED_SECRET}
+      LAKEFS_AUTH_API_ENDPOINT: http://authz:8002/api/v1
+      LAKEFS_AUTH_API_HEALTH_CHECK_TIMEOUT: 120s
+      LAKEFS_AUTH_AUTHENTICATION_API_ENDPOINT: http://authn:8001/api/v1
+      LAKEFS_AUTH_UI_CONFIG_RBAC: internal
+      LAKEFS_AUTH_UI_CONFIG_FALLBACK_LOGIN_URL: /oidc/login
+      LAKEFS_AUTH_UI_CONFIG_FALLBACK_LOGIN_LABEL: Sign in with SSO
+      LAKEFS_AUTH_UI_CONFIG_LOGOUT_URL: /oidc/logout
+      LAKEFS_AUTH_UI_CONFIG_LOGIN_COOKIE_NAMES: internal_auth_session
+      # No telemetry, and no welcome page that asks for an email address and a country.
+      LAKEFS_STATS_ENABLED: "false"
+      LAKEFS_USAGE_REPORT_ENABLED: "false"
+      LAKEFS_EMAIL_SUBSCRIPTION_ENABLED: "false"
+    volumes:
+      - lakefs-data:/home/lakefs
+    depends_on:
+      - authz
+    restart: unless-stopped
+
+  proxy:
+    image: nginx:1.27-alpine
+    ports:
+      - "${PROXY_PORT:-80}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - lakefs
+      - authn
+    restart: unless-stopped
+
+volumes:
+  authz-db:
+  lakefs-data:

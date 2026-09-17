@@ -1,0 +1,71 @@
+# Extra lakeFS settings that an environment variable cannot express.
+#
+# Everything else in this demo is configured with LAKEFS_* variables in
+# docker-compose.yml, and those win over this file. `ui.snippets` is a list of
+# objects, which viper cannot read from a variable, so it lives here.
+#
+# lakeFS writes each snippet's `code` verbatim into the `<!--Snippets-->` marker
+# in the `<head>` of its index.html (pkg/api/injectsnippetsfs.go). The code is
+# not escaped, so it can be any HTML or script.
+ui:
+  snippets:
+    - id: policy-builder-button
+      code: |
+        <script>
+        // Adds a link to the lakefs-authz policy builder on the lakeFS policy
+        // pages. The builder reads the lakeFS session cookie, so it opens
+        // already signed in as the person looking at this page.
+        (function () {
+          var HREF = "http://localhost:8080";
+          var ID = "lakefs-policy-builder-link";
+
+          // Only on the pages about policies: the list at /auth/policies and one
+          // policy at /auth/policies/<id>. Everywhere else the link is noise,
+          // and on the login screen it would not work at all.
+          function wanted() {
+            return location.pathname.indexOf("/auth/policies") === 0;
+          }
+
+          function build() {
+            var a = document.createElement("a");
+            a.id = ID;
+            a.href = HREF;
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.textContent = "Open policy builder";
+            a.title = "Open the lakefs-authz policy builder";
+            a.style.cssText = [
+              "position:fixed", "right:1rem", "bottom:1rem", "z-index:2147483647",
+              "padding:.5rem .9rem", "border-radius:999px",
+              "background:#673ab7", "color:#fff", "text-decoration:none",
+              "font:600 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+              "box-shadow:0 2px 8px rgba(0,0,0,.3)"
+            ].join(";");
+            return a;
+          }
+
+          function sync() {
+            var existing = document.getElementById(ID);
+            if (wanted() && !existing) document.body.appendChild(build());
+            if (!wanted() && existing) existing.remove();
+          }
+
+          // lakeFS is a single page app, so the route changes without a reload.
+          // Watch both the back button and the history calls the router makes.
+          ["pushState", "replaceState"].forEach(function (name) {
+            var original = history[name];
+            history[name] = function () {
+              var result = original.apply(this, arguments);
+              sync();
+              return result;
+            };
+          });
+          window.addEventListener("popstate", sync);
+
+          if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", sync);
+          } else {
+            sync();
+          }
+        })();
+        </script>

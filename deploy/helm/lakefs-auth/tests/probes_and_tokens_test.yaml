@@ -1,0 +1,70 @@
+suite: probes and tokens
+templates:
+  - templates/authz-deployment.yaml
+  - templates/authn-deployment.yaml
+values:
+  - ./values/base.yaml
+release:
+  name: lakefs-auth
+  namespace: lakefs
+tests:
+  - it: wires the readiness probe of lakefs-authz to the endpoint that checks the database
+    asserts:
+      - template: templates/authz-deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /readyz
+      - template: templates/authz-deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /api/v1/healthcheck
+
+  - it: hands the static API token to both servers
+    set:
+      authz.apiToken.existingSecret: lakefs-authz-token
+    asserts:
+      - template: templates/authz-deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHZ_API_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: lakefs-authz-token
+                key: api-token
+      - template: templates/authn-deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHN_AUTHZ_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: lakefs-authz-token
+                key: api-token
+
+  - it: sends no token to lakefs-authn without a static token
+    asserts:
+      - template: templates/authn-deployment.yaml
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHN_AUTHZ_TOKEN
+          any: true
+
+  - it: passes the STS allow list and the provisioning switch
+    set:
+      authn.stsAllowedRedirectUris: http://127.0.0.1/callback
+      authn.autoProvision: false
+    asserts:
+      - template: templates/authn-deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHN_STS_ALLOWED_REDIRECT_URIS
+            value: http://127.0.0.1/callback
+      - template: templates/authn-deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHN_AUTO_PROVISION
+            value: "false"

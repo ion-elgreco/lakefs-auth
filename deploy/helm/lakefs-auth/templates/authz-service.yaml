@@ -1,0 +1,23 @@
+{{- if .Values.authz.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: lakefs-authz
+  labels:
+    app.kubernetes.io/name: lakefs-authz
+    {{- include "lakefs-auth.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: lakefs-authz
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.authz.port }}
+      targetPort: http
+    {{- if .Values.authz.metrics.enabled }}
+    - name: metrics
+      port: {{ .Values.authz.metrics.port }}
+      targetPort: metrics
+    {{- end }}
+{{- end }}

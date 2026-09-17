@@ -1,0 +1,65 @@
+[package]
+name = "lakefs-authn"
+description = "lakeFS authentication server: OIDC browser login and STS code exchange"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+# Integration tests that need a Docker daemon.
+docker-tests = []
+
+[[bin]]
+name = "lakefs-authn"
+path = "src/main.rs"
+
+[lib]
+name = "lakefs_authn"
+path = "src/lib.rs"
+
+[dependencies]
+lakefs-auth-core = { path = "../lakefs-auth-core", features = ["server", "jwt"] }
+lakefs-authz-client = { path = "../lakefs-authz-client" }
+axum = { workspace = true }
+axum-extra = { workspace = true }
+cookie = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+http = { workspace = true }
+openidconnect = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+jsonwebtoken = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+subtle = { workspace = true }
+rand = { workspace = true }
+base64 = { workspace = true }
+uuid = { workspace = true }
+jiff = { workspace = true }
+clap = { workspace = true }
+humantime = { workspace = true }
+prometheus = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+lakefs-authz = { path = "../lakefs-authz", features = ["testkit"] }
+wiremock = { workspace = true }
+pretty_assertions = { workspace = true }
+testcontainers = { workspace = true }
+testcontainers-modules = { workspace = true }
+futures = { workspace = true }
+http-body-util = { workspace = true }
+serde_urlencoded = { workspace = true }
+percent-encoding = { workspace = true }
+
+[lints]
+workspace = true

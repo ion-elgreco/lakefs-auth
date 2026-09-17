@@ -1,0 +1,91 @@
+suite: metrics wiring
+templates:
+  - authz-deployment.yaml
+  - authn-deployment.yaml
+  - authz-service.yaml
+  - authn-service.yaml
+values:
+  - values/base.yaml
+tests:
+  - it: adds no metrics port and no metrics variable by default
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: metrics
+            containerPort: 9090
+        template: authz-deployment.yaml
+      - notContains:
+          path: spec.ports
+          content:
+            name: metrics
+            port: 9090
+            targetPort: metrics
+        template: authz-service.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: metrics
+            containerPort: 9090
+        template: authn-deployment.yaml
+
+  - it: opens the metrics port on lakefs-authz when it is enabled
+    set:
+      authz.metrics.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: metrics
+            containerPort: 9090
+        template: authz-deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHZ_METRICS_LISTEN
+            value: "0.0.0.0:9090"
+        template: authz-deployment.yaml
+      - contains:
+          path: spec.ports
+          content:
+            name: metrics
+            port: 9090
+            targetPort: metrics
+        template: authz-service.yaml
+
+  - it: opens the metrics port on lakefs-authn when it is enabled
+    set:
+      authn.metrics.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHN_METRICS_LISTEN
+            value: "0.0.0.0:9090"
+        template: authn-deployment.yaml
+      - contains:
+          path: spec.ports
+          content:
+            name: metrics
+            port: 9090
+            targetPort: metrics
+        template: authn-service.yaml
+
+  - it: honours a custom metrics port
+    set:
+      authz.metrics.enabled: true
+      authz.metrics.port: 9110
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LAKEFS_AUTHZ_METRICS_LISTEN
+            value: "0.0.0.0:9110"
+        template: authz-deployment.yaml
+      - contains:
+          path: spec.ports
+          content:
+            name: metrics
+            port: 9110
+            targetPort: metrics
+        template: authz-service.yaml

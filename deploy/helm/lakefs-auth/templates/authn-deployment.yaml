@@ -1,0 +1,135 @@
+{{- if .Values.authn.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lakefs-authn
+  labels:
+    app.kubernetes.io/name: lakefs-authn
+    {{- include "lakefs-auth.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.authn.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lakefs-authn
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lakefs-authn
+        {{- include "lakefs-auth.labels" . | nindent 8 }}
+      {{- with .Values.authn.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "lakefs-auth.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: lakefs-authn
+          image: {{ include "lakefs-auth.authnImage" . | quote }}
+          imagePullPolicy: {{ .Values.authn.imagePullPolicy }}
+          securityContext:
+            {{- include "lakefs-auth.containerSecurityContext" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.authn.port }}
+            {{- if .Values.authn.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.authn.metrics.port }}
+            {{- end }}
+          env:
+            - name: LAKEFS_AUTHN_LISTEN
+              value: "0.0.0.0:{{ .Values.authn.port }}"
+            {{- if .Values.authn.metrics.enabled }}
+            - name: LAKEFS_AUTHN_METRICS_LISTEN
+              value: "0.0.0.0:{{ .Values.authn.metrics.port }}"
+            {{- end }}
+            - name: LAKEFS_AUTHN_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lakefs-auth.sharedSecretName" . }}
+                  key: {{ .Values.sharedSecret.secretKey | quote }}
+            - name: LAKEFS_AUTHN_PUBLIC_URL
+              value: {{ required "authn.publicUrl is required: the external base URL of lakeFS, for example https://lakefs.example.com" .Values.authn.publicUrl | quote }}
+            - name: LAKEFS_AUTHN_AUTHZ_URL
+              value: {{ include "lakefs-auth.authzUrl" . | quote }}
+            {{- with .Values.authz.apiToken.existingSecret }}
+            # With a static token configured, lakefs-authz accepts only that
+            # token, so lakefs-authn must send the same one.
+            - name: LAKEFS_AUTHN_AUTHZ_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.authz.apiToken.secretKey | quote }}
+            {{- end }}
+            {{- with .Values.authn.stsAllowedRedirectUris }}
+            - name: LAKEFS_AUTHN_STS_ALLOWED_REDIRECT_URIS
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if not .Values.authn.autoProvision }}
+            - name: LAKEFS_AUTHN_AUTO_PROVISION
+              value: "false"
+            {{- end }}
+            - name: LAKEFS_AUTHN_OIDC_ISSUER
+              value: {{ required "authn.oidc.issuer is required: the issuer URL exactly as the identity provider advertises it" .Values.authn.oidc.issuer | quote }}
+            - name: LAKEFS_AUTHN_OIDC_CLIENT_ID
+              value: {{ required "authn.oidc.clientId is required" .Values.authn.oidc.clientId | quote }}
+            {{- with include "lakefs-auth.oidcClientSecretName" . }}
+            - name: LAKEFS_AUTHN_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.authn.oidc.clientSecret.secretKey | quote }}
+            {{- end }}
+            - name: LAKEFS_AUTHN_OIDC_SCOPES
+              value: {{ .Values.authn.oidc.scopes | quote }}
+            {{- with .Values.authn.oidc.validateClaims }}
+            - name: LAKEFS_AUTHN_OIDC_VALIDATE_CLAIMS
+              value: {{ . | quote }}
+            {{- end }}
+            - name: LAKEFS_AUTHN_INITIAL_GROUPS
+              value: {{ .Values.authn.initialGroups | quote }}
+            {{- with .Values.authn.groupsClaim }}
+            - name: LAKEFS_AUTHN_GROUPS_CLAIM
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.authn.groupMap }}
+            - name: LAKEFS_AUTHN_GROUP_MAP
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.authn.postLoginRedirectUrl }}
+            - name: LAKEFS_AUTHN_POST_LOGIN_REDIRECT_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.authn.postLogoutRedirectUrl }}
+            - name: LAKEFS_AUTHN_POST_LOGOUT_REDIRECT_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.authn.sessionTtl }}
+            - name: LAKEFS_AUTHN_SESSION_TTL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: LAKEFS_AUTHN_RP_INITIATED_LOGOUT
+              value: {{ .Values.authn.rpInitiatedLogout | quote }}
+            - name: LAKEFS_AUTHN_LOG_LEVEL
+              value: {{ .Values.authn.logLevel | quote }}
+            - name: LAKEFS_AUTHN_LOG_FORMAT
+              value: {{ .Values.authn.logFormat | quote }}
+            {{- with .Values.authn.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.authn.resources | nindent 12 }}
+{{- end }}

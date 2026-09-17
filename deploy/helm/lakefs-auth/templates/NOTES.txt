@@ -1,0 +1,40 @@
+lakefs-auth {{ .Chart.AppVersion }} installed in namespace {{ .Release.Namespace }}.
+
+Point lakeFS at the two services. With the lakeFS Helm chart, put this in `lakefsConfig` and set
+`existingSecret` to the Secret that holds the shared secret ({{ include "lakefs-auth.sharedSecretName" . }},
+key {{ .Values.sharedSecret.secretKey }}):
+
+  auth:
+    api:
+      endpoint: http://lakefs-authz.{{ .Release.Namespace }}.svc:{{ .Values.authz.port }}{{ .Values.authz.basePath }}
+{{- if .Values.authn.enabled }}
+    authentication_api:
+      endpoint: http://lakefs-authn.{{ .Release.Namespace }}.svc:{{ .Values.authn.port }}/api/v1
+    ui_config:
+      rbac: internal
+      fallback_login_url: /oidc/login
+      fallback_login_label: "Sign in with SSO"
+      logout_url: /oidc/logout
+      login_cookie_names: [internal_auth_session]
+
+The `/oidc/` prefix of {{ .Values.authn.publicUrl }} must reach the lakefs-authn Service.
+{{- if .Values.authn.ingress.enabled }}
+The chart created an Ingress for host {{ .Values.authn.ingress.host }} and path {{ .Values.authn.ingress.path }}.
+{{- end }}
+{{- if .Values.authn.httpRoute.enabled }}
+The chart created an HTTPRoute for the `/oidc` prefix, attached to {{ range .Values.authn.httpRoute.parentRefs }}{{ .name }} {{ end }}.
+{{- end }}
+{{- if not (or .Values.authn.ingress.enabled .Values.authn.httpRoute.enabled) }}
+Enable `authn.ingress` or `authn.httpRoute`, or add the rule to your own Ingress or Gateway.
+{{- end }}
+{{- else }}
+    ui_config:
+      rbac: internal
+{{- end }}
+
+Check the servers:
+
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/lakefs-authz
+{{- if .Values.authn.enabled }}
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/lakefs-authn
+{{- end }}

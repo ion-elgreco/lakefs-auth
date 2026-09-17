@@ -1,0 +1,10 @@
+sharedSecret:
+  value: test-shared-secret
+authz:
+  database:
+    url: postgres://authz:authz@postgres:5432/authz
+authn:
+  publicUrl: https://lakefs.example.com
+  oidc:
+    issuer: https://idp.example.com/realms/lakefs
+    clientId: lakefs

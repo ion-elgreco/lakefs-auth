@@ -1,0 +1,6 @@
+[files]
+extend-exclude = [
+  # PEM and base64 test material, not prose
+  "crates/lakefs-authn/fixtures/",
+  "crates/lakefs-authn/tests/common/testkey.rs",
+]

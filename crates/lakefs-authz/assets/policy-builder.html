@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lakeFS policy builder</title>
+<style>
+:root {
+  --bg: #ffffff; --panel: #ffffff; --raised: #f7f7fa;
+  --fg: #1b1b1f; --muted: #5f5f6d; --line: #e2e2e9;
+  --accent: #673ab7; --accent-fg: #ffffff; --accent-soft: #ede7f6;
+  --ok: #2e7d32; --warn: #a55a00; --error: #b3261e;
+  --code-bg: #f5f5f8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171b; --panel: #1e1e23; --raised: #26262d;
+    --fg: #e7e7ec; --muted: #a2a2b0; --line: #34343d;
+    --accent: #b39ddb; --accent-fg: #17171b; --accent-soft: #2b2440;
+    --ok: #81c784; --warn: #ffb74d; --error: #f2b8b5;
+    --code-bg: #23232a;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 1.5rem; background: var(--bg); color: var(--fg);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* ---- page header ---- */
+.page-head { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; margin-bottom: .2rem; }
+h1 { font-size: 1.35rem; margin: 0; letter-spacing: -0.01em; }
+p.lede { color: var(--muted); margin: 0 0 1.1rem; max-width: 62ch; }
+.badge {
+  font-size: .75rem; padding: .15rem .55rem; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); white-space: nowrap;
+}
+.badge.live { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+/* ---- layout ---- */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(22rem, 26rem); gap: 1.25rem; align-items: start; }
+@media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
+
+.panel { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 1rem; margin-bottom: 1rem; }
+.panel > h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 .7rem; }
+
+/* ---- form controls ---- */
+label { display: block; font-size: .78rem; color: var(--muted); margin-bottom: .25rem; }
+input[type=text], input[type=search], select {
+  width: 100%; padding: .45rem .6rem; border: 1px solid var(--line); border-radius: 7px;
+  background: var(--bg); color: var(--fg); font: inherit;
+}
+input:focus-visible, select:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+button {
+  font: inherit; padding: .38rem .75rem; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg); cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.ghost { border-color: transparent; color: var(--muted); padding: .3rem .5rem; }
+button.ghost:hover { border-color: var(--line); color: var(--fg); }
+.hint { font-size: .76rem; color: var(--muted); margin: .3rem 0 0; }
+
+/* ---- statement ---- */
+.statement { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--panel); padding: .9rem 1rem 1rem; margin-bottom: .9rem; }
+.statement.deny { border-left-color: var(--error); }
+.statement-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .8rem; flex-wrap: wrap; }
+.statement-head .title { font-weight: 600; font-size: .92rem; }
+.statement-head .spacer { flex: 1; }
+.statement-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1rem; }
+@media (max-width: 820px) { .statement-body { grid-template-columns: 1fr; } }
+
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.segmented button { border: 0; border-radius: 0; padding: .28rem .7rem; font-size: .84rem; }
+.segmented button[aria-pressed=true] { background: var(--accent); color: var(--accent-fg); }
+.segmented button.deny[aria-pressed=true] { background: var(--error); color: #fff; }
+
+/* ---- action picker ---- */
+.picker { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.picker-search { padding: .45rem; border-bottom: 1px solid var(--line); background: var(--raised); }
+.picker-list {
+  max-height: 19rem; overflow-y: auto; padding: 0 .55rem 1.7rem;
+  /* The fade marks a clipped row as "scroll for more". The bottom padding is
+     taller than the fade, so a list that fits is never dimmed. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.6rem), transparent);
+}
+.picker-list h4 {
+  position: sticky; top: 0; z-index: 1; background: var(--panel);
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+  margin: 0; padding: .5rem 0 .25rem; border-bottom: 1px solid var(--line);
+}
+.picker-list .empty { color: var(--muted); font-size: .84rem; padding: .8rem .2rem; }
+.action {
+  display: flex; align-items: center; gap: .45rem; font-size: .84rem;
+  padding: .16rem .25rem; border-radius: 5px; cursor: pointer; min-width: 0; margin: 0;
+}
+.action:hover { background: var(--raised); }
+.action input { margin: 0; flex: 0 0 auto; }
+.action .name { overflow-wrap: anywhere; color: var(--fg); }
+.action .kind { margin-left: auto; font-size: .68rem; color: var(--muted); white-space: nowrap; padding-left: .4rem; }
+
+/* ---- chips ---- */
+.chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .5rem; }
+.chip {
+  display: inline-flex; align-items: center; gap: .25rem; font-size: .76rem;
+  padding: .12rem .3rem .12rem .5rem; border-radius: 999px;
+  background: var(--accent-soft); border: 1px solid var(--line); color: var(--fg);
+}
+.chip button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 .15rem; font-size: .95rem; line-height: 1; border-radius: 999px; }
+.chip button:hover { color: var(--error); }
+.chips .none { font-size: .8rem; color: var(--muted); }
+
+/* ---- scope ---- */
+.fields { display: grid; gap: .5rem; }
+.arn { margin-top: .6rem; padding: .5rem .6rem; background: var(--code-bg); border: 1px solid var(--line); border-radius: 7px; font-size: .78rem; overflow-wrap: anywhere; }
+.arn .label { display: block; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: .15rem; }
+
+/* ---- output ---- */
+.sticky { position: sticky; top: 1rem; }
+.tabs { display: flex; gap: .35rem; align-items: center; margin-bottom: .6rem; }
+.tabs .spacer { flex: 1; }
+.tabs button[aria-selected=true] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+pre {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: .75rem; margin: 0; font-size: .8rem; max-height: 26rem; overflow-y: auto;
+  /* Wrap instead of scrolling sideways: the ARN is the part worth reading. */
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.messages { margin: .7rem 0 0; padding: 0; list-style: none; font-size: .82rem; }
+.messages li { padding: .22rem 0 .22rem 1.1rem; position: relative; overflow-wrap: anywhere; }
+.messages li::before { position: absolute; left: 0; top: .22rem; }
+.messages li.ok { color: var(--ok); } .messages li.ok::before { content: "\2713"; }
+.messages li.warn { color: var(--warn); } .messages li.warn::before { content: "\26A0"; }
+.messages li.error { color: var(--error); } .messages li.error::before { content: "\2715"; }
+
+.push { margin-top: .9rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+.push button[disabled] { opacity: .5; cursor: not-allowed; border-color: var(--line); }
+.result { margin: .5rem 0 0; font-size: .82rem; }
+.result.ok { color: var(--ok); } .result.bad { color: var(--error); }
+
+.empty-state { border: 1px dashed var(--line); border-radius: 10px; padding: 1.4rem; text-align: center; color: var(--muted); margin-bottom: .9rem; }
+.actions-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.presets { margin-top: .8rem; }
+.presets summary { font-size: .78rem; color: var(--muted); cursor: pointer; }
+.presets summary:hover { color: var(--fg); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="page-head">
+    <h1>lakeFS policy builder</h1>
+    <span class="badge" id="mode">standalone</span>
+  </div>
+  <p class="lede">Pick actions, choose a scope, and copy the policy. Every action and ARN shape comes from the lakeFS source, so the builder warns when a scope cannot match what you selected.</p>
+</header>
+
+<div class="layout">
+  <div>
+    <div class="panel">
+      <h2>Policy</h2>
+      <label for="policy-name">Name</label>
+      <input type="text" id="policy-name" value="ReadOnly" spellcheck="false" autocomplete="off">
+      <p class="hint">No slashes, no control characters, at most 512 bytes.</p>
+    </div>
+
+    <div id="statements"></div>
+
+    <div class="actions-row">
+      <button id="add-statement" class="primary">Add statement</button>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+
+  <div class="sticky">
+    <div class="panel">
+      <h2>Output</h2>
+      <div class="tabs">
+        <button id="tab-yaml" aria-selected="true">Bootstrap YAML</button>
+        <button id="tab-json" aria-selected="false">API JSON</button>
+        <span class="spacer"></span>
+        <button id="copy">Copy</button>
+      </div>
+      <pre id="output"></pre>
+      <ul class="messages" id="messages"></ul>
+      <div class="push" id="push" hidden>
+        <button id="create" class="primary">Create in lakeFS</button>
+        <p class="result" id="result"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<datalist id="dl-repositories"></datalist>
+<datalist id="dl-branches"></datalist>
+<datalist id="dl-users"></datalist>
+<datalist id="dl-groups"></datalist>
+<datalist id="dl-policies"></datalist>
+
+<script>
+// <catalog> Generated from lakefs-auth-core::catalog. Run `just sync-catalog` after changing it.
+const CATALOG = {"actions":[{"name":"fs:ReadRepository","resources":["repository"],"service":"fs"},{"name":"fs:CreateRepository","resources":["repository"],"service":"fs"},{"name":"fs:UpdateRepository","resources":["repository"],"service":"fs"},{"name":"fs:AttachStorageNamespace","resources":["namespace"],"service":"fs"},{"name":"fs:ImportFromStorage","resources":["namespace"],"service":"fs"},{"name":"fs:ImportCancel","resources":["branch"],"service":"fs"},{"name":"fs:DeleteRepository","resources":["repository"],"service":"fs"},{"name":"fs:ListRepositories","resources":["all"],"service":"fs"},{"name":"fs:ReadObject","resources":["object"],"service":"fs"},{"name":"fs:WriteObject","resources":["object","branch"],"service":"fs"},{"name":"fs:DeleteObject","resources":["object"],"service":"fs"},{"name":"fs:ListObjects","resources":["repository"],"service":"fs"},{"name":"fs:CreateCommit","resources":["branch","repository"],"service":"fs"},{"name":"fs:ReadCommit","resources":["repository"],"service":"fs"},{"name":"fs:ListCommits","resources":["repository"],"service":"fs"},{"name":"fs:CreateBranch","resources":["branch","repository"],"service":"fs"},{"name":"fs:DeleteBranch","resources":["branch"],"service":"fs"},{"name":"fs:ReadBranch","resources":["branch"],"service":"fs"},{"name":"fs:RevertBranch","resources":["branch"],"service":"fs"},{"name":"fs:ListBranches","resources":["repository"],"service":"fs"},{"name":"fs:CreateTag","resources":["tag","repository"],"service":"fs"},{"name":"fs:DeleteTag","resources":["tag"],"service":"fs"},{"name":"fs:ReadTag","resources":["tag"],"service":"fs"},{"name":"fs:ListTags","resources":["repository"],"service":"fs"},{"name":"fs:ReadConfig","resources":["all"],"service":"fs"},{"name":"auth:ReadUser","resources":["user"],"service":"auth"},{"name":"auth:CreateUser","resources":["user"],"service":"auth"},{"name":"auth:DeleteUser","resources":["user"],"service":"auth"},{"name":"auth:ListUsers","resources":["all"],"service":"auth"},{"name":"auth:ReadGroup","resources":["group"],"service":"auth"},{"name":"auth:CreateGroup","resources":["group"],"service":"auth"},{"name":"auth:DeleteGroup","resources":["group"],"service":"auth"},{"name":"auth:ListGroups","resources":["all"],"service":"auth"},{"name":"auth:AddGroupMember","resources":["group"],"service":"auth"},{"name":"auth:RemoveGroupMember","resources":["group"],"service":"auth"},{"name":"auth:ReadPolicy","resources":["policy"],"service":"auth"},{"name":"auth:CreatePolicy","resources":["policy"],"service":"auth"},{"name":"auth:UpdatePolicy","resources":["policy"],"service":"auth"},{"name":"auth:DeletePolicy","resources":["policy"],"service":"auth"},{"name":"auth:ListPolicies","resources":["all"],"service":"auth"},{"name":"auth:AttachPolicy","resources":["user","group","policy"],"service":"auth"},{"name":"auth:DetachPolicy","resources":["user","group","policy"],"service":"auth"},{"name":"auth:ReadCredentials","resources":["user"],"service":"auth"},{"name":"auth:CreateCredentials","resources":["user"],"service":"auth"},{"name":"auth:DeleteCredentials","resources":["user"],"service":"auth"},{"name":"auth:ListCredentials","resources":["user"],"service":"auth"},{"name":"auth:CreateUserExternalPrincipal","resources":["user"],"service":"auth"},{"name":"auth:DeleteUserExternalPrincipal","resources":["user"],"service":"auth"},{"name":"auth:ReadExternalPrincipal","resources":["external_principal"],"service":"auth"},{"name":"ci:ReadAction","resources":["repository"],"service":"ci"},{"name":"retention:PrepareGarbageCollectionCommits","resources":["repository"],"service":"retention"},{"name":"retention:GetGarbageCollectionRules","resources":["repository"],"service":"retention"},{"name":"retention:SetGarbageCollectionRules","resources":["repository"],"service":"retention"},{"name":"retention:PrepareGarbageCollectionUncommitted","resources":["repository"],"service":"retention"},{"name":"branches:GetBranchProtectionRules","resources":["repository"],"service":"branches"},{"name":"branches:SetBranchProtectionRules","resources":["repository"],"service":"branches"},{"name":"pr:ReadPullRequest","resources":["repository"],"service":"pr"},{"name":"pr:WritePullRequest","resources":["repository"],"service":"pr"},{"name":"pr:ListPullRequests","resources":["repository"],"service":"pr"},{"name":"catalog:ListNamespaces","resources":["catalog_namespace"],"service":"catalog"},{"name":"catalog:GetNamespace","resources":["catalog_namespace"],"service":"catalog"},{"name":"catalog:CreateNamespace","resources":["catalog_namespace"],"service":"catalog"},{"name":"catalog:UpdateNamespace","resources":["catalog_namespace"],"service":"catalog"},{"name":"catalog:DeleteNamespace","resources":["catalog_namespace"],"service":"catalog"},{"name":"catalog:ListTables","resources":["catalog_table"],"service":"catalog"},{"name":"catalog:ReadTable","resources":["catalog_table"],"service":"catalog"},{"name":"catalog:CreateTable","resources":["catalog_table"],"service":"catalog"},{"name":"catalog:UpdateTable","resources":["catalog_table"],"service":"catalog"},{"name":"catalog:DeleteTable","resources":["catalog_table"],"service":"catalog"},{"name":"catalog:ListViews","resources":["catalog_view"],"service":"catalog"},{"name":"catalog:ReadView","resources":["catalog_view"],"service":"catalog"},{"name":"catalog:CreateView","resources":["catalog_view"],"service":"catalog"},{"name":"catalog:UpdateView","resources":["catalog_view"],"service":"catalog"},{"name":"catalog:DeleteView","resources":["catalog_view"],"service":"catalog"}],"kinds":{"all":{"fields":[],"template":"*"},"branch":{"fields":["repository","branch"],"template":"arn:lakefs:fs:::repository/{repository}/branch/{branch}"},"catalog_namespace":{"fields":["repository","namespace"],"template":"arn:lakefs:catalog:::namespace/{repository}/{namespace}"},"catalog_table":{"fields":["repository","namespace","table"],"template":"arn:lakefs:catalog:::table/{repository}/{namespace}/{table}"},"catalog_view":{"fields":["repository","namespace","view"],"template":"arn:lakefs:catalog:::view/{repository}/{namespace}/{view}"},"external_principal":{"fields":["principal"],"template":"arn:lakefs:auth:::externalPrincipal/{principal}"},"group":{"fields":["group"],"template":"arn:lakefs:auth:::group/{group}"},"namespace":{"fields":["namespace"],"template":"arn:lakefs:fs:::namespace/{namespace}"},"object":{"fields":["repository","path"],"template":"arn:lakefs:fs:::repository/{repository}/object/{path}"},"policy":{"fields":["policy"],"template":"arn:lakefs:auth:::policy/{policy}"},"repository":{"fields":["repository"],"template":"arn:lakefs:fs:::repository/{repository}"},"tag":{"fields":["repository","tag"],"template":"arn:lakefs:fs:::repository/{repository}/tag/{tag}"},"user":{"fields":["user"],"template":"arn:lakefs:auth:::user/{user}"}}};
+// </catalog>
+
+const SERVICES = ["fs", "auth", "ci", "retention", "branches", "pr", "catalog"];
+const KIND_LABEL = {
+  all: "Everything (*)", repository: "Repository", object: "Object path", branch: "Branch",
+  tag: "Tag", namespace: "Storage namespace", user: "User", group: "Group", policy: "Policy",
+  external_principal: "External principal", catalog_namespace: "Catalog namespace",
+  catalog_table: "Catalog table", catalog_view: "Catalog view",
+};
+const FIELD_LIST = {
+  repository: "dl-repositories", branch: "dl-branches", user: "dl-users",
+  group: "dl-groups", policy: "dl-policies",
+};
+const PRESETS = [
+  { label: "Read objects", actions: ["fs:ReadObject"] },
+  { label: "Write objects", actions: ["fs:ReadObject", "fs:WriteObject", "fs:DeleteObject"] },
+  { label: "Browse repository", actions: ["fs:ReadRepository", "fs:ListObjects", "fs:ListBranches", "fs:ListCommits", "fs:ReadCommit", "fs:ListTags"] },
+  { label: "Commit on a branch", actions: ["fs:ReadBranch", "fs:CreateCommit", "fs:RevertBranch"] },
+  { label: "Manage branches", actions: ["fs:CreateBranch", "fs:DeleteBranch", "fs:ReadBranch"] },
+  { label: "Own credentials", actions: ["auth:ReadCredentials", "auth:CreateCredentials", "auth:DeleteCredentials", "auth:ListCredentials"] },
+];
+
+let live = { lakefs: false, user: null };
+let statements = [];
+let tab = "yaml";
+let nextId = 1;
+
+// ---------------------------------------------------------------- model
+
+function newStatement() {
+  return { id: nextId++, effect: "allow", actions: new Set(), kind: "all", fields: {}, filter: "" };
+}
+
+/** The resource kinds every selected action agrees on, most specific first. */
+function suggestedKinds(statement) {
+  const chosen = [...statement.actions].map((name) => CATALOG.actions.find((a) => a.name === name)).filter(Boolean);
+  if (chosen.length === 0) return [];
+  let shared = chosen[0].resources.slice();
+  for (const action of chosen.slice(1)) shared = shared.filter((kind) => action.resources.includes(kind));
+  return shared;
+}
+
+/** Fills the ARN template of the chosen kind. Empty fields become `*`. */
+function resourceOf(statement) {
+  const kind = CATALOG.kinds[statement.kind];
+  if (!kind) return "*";
+  return kind.fields.reduce(
+    (arn, field) => arn.replace("{" + field + "}", (statement.fields[field] || "").trim() || "*"),
+    kind.template,
+  );
+}
+
+/** Moves the scope to the best match for what is now selected. */
+function realignKind(statement) {
+  const shared = suggestedKinds(statement);
+  if (shared.length > 0 && !shared.includes(statement.kind)) statement.kind = shared[0];
+}
+
+// ------------------------------------------------------------ validation
+// These rules mirror lakefs-auth-core::validate, which is what the server applies.
+
+function validate(name, list) {
+  const messages = [];
+  if (!name.trim()) messages.push(["error", "The policy needs a name."]);
+  else if (name.includes("/")) messages.push(["error", "A policy name must not contain '/'."]);
+  else if (new TextEncoder().encode(name).length > 512) messages.push(["error", "A policy name is at most 512 bytes."]);
+
+  if (list.length === 0) messages.push(["error", "A policy needs at least one statement."]);
+
+  list.forEach((statement, index) => {
+    const label = "Statement " + (index + 1);
+    if (statement.actions.size === 0) messages.push(["error", label + " needs at least one action."]);
+
+    // A resource of "*" matches every action, so neither scope warning applies
+    // to it. lakeFS short-circuits on "*" before it compares ARNs at all.
+    const shared = suggestedKinds(statement);
+    if (statement.actions.size > 1 && shared.length === 0 && statement.kind !== "all") {
+      messages.push(["warn", label + " mixes actions that lakeFS checks against different ARNs. Split it, or use '*'."]);
+    } else if (shared.length > 0 && statement.kind !== "all" && !shared.includes(statement.kind)) {
+      messages.push(["warn", label + " is scoped to " + KIND_LABEL[statement.kind] + ", which these actions never match."]);
+    }
+
+    const resource = resourceOf(statement);
+    if (resource !== "*") {
+      const parts = resource.split(":");
+      if (parts.length < 6 || parts[0] !== "arn") messages.push(["error", label + " has a resource that is not an ARN."]);
+      else if (parts[1] !== "lakefs") messages.push(["error", label + " has an ARN whose partition is not 'lakefs'."]);
+    }
+    if (statement.actions.has("fs:ListObjects") && statement.kind === "object") {
+      messages.push(["warn", label + " scopes fs:ListObjects to a path, but lakeFS checks it against the repository. Listing stays repository-wide."]);
+    }
+    if (statement.actions.has("fs:WriteObject") && statement.kind === "branch") {
+      messages.push(["warn", label + " scopes fs:WriteObject to a branch. Only the import endpoint checks that ARN; normal uploads check the object ARN."]);
+    }
+  });
+  return messages;
+}
+
+// ---------------------------------------------------------------- output
+
+function policyObject() {
+  return {
+    name: document.getElementById("policy-name").value.trim(),
+    statement: statements.map((statement) => ({
+      effect: statement.effect,
+      action: [...statement.actions],
+      resource: resourceOf(statement),
+    })),
+  };
+}
+
+function quote(value) {
+  return '"' + value.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+}
+
+function toYaml(policy) {
+  const lines = ["policies:", "  - name: " + quote(policy.name), "    statement:"];
+  for (const statement of policy.statement) {
+    lines.push("      - effect: " + statement.effect);
+    lines.push("        action: [" + statement.action.map(quote).join(", ") + "]");
+    lines.push("        resource: " + quote(statement.resource));
+  }
+  return lines.join("\n");
+}
+
+function render() {
+  const policy = policyObject();
+  document.getElementById("output").textContent =
+    tab === "yaml" ? toYaml(policy) : JSON.stringify(policy, null, 2);
+
+  const list = document.getElementById("messages");
+  list.textContent = "";
+  const messages = validate(policy.name, statements);
+  if (messages.length === 0) {
+    list.append(element("li", { className: "ok", textContent: "The policy passes every rule the server applies." }));
+  } else {
+    for (const [level, text] of messages) {
+      list.append(element("li", { className: level, textContent: text }));
+    }
+  }
+
+  // Creating is offered only with a live session, and only for a policy that
+  // would pass. Warnings are fine; errors are not.
+  const push = document.getElementById("push");
+  push.hidden = !live.user;
+  document.getElementById("create").disabled = messages.some(([level]) => level === "error");
+}
+
+// ------------------------------------------------------------- rendering
+
+function element(tag, props = {}, children = []) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+}
+
+/** Removable chips for what is selected, so the choice stays visible while scrolling. */
+function renderChips(statement) {
+  const box = element("div", { className: "chips" });
+  if (statement.actions.size === 0) {
+    box.append(element("span", { className: "none", textContent: "No action selected yet." }));
+    return box;
+  }
+  for (const name of [...statement.actions].sort()) {
+    const remove = element("button", { type: "button", textContent: "×", title: "Remove " + name });
+    remove.setAttribute("aria-label", "Remove " + name);
+    remove.onclick = () => { statement.actions.delete(name); realignKind(statement); draw(); };
+    box.append(element("span", { className: "chip" }, [element("span", { className: "mono", textContent: name }), remove]));
+  }
+  return box;
+}
+
+/** A searchable list of every action, grouped by service and bounded in height. */
+function renderPicker(statement) {
+  const search = element("input", {
+    type: "search", value: statement.filter, placeholder: "Filter actions, for example  read  or  branch",
+    spellcheck: false, autocomplete: "off",
+  });
+  search.oninput = () => { statement.filter = search.value; redrawPicker(statement); };
+
+  const list = element("div", { className: "picker-list" });
+  fillPicker(list, statement);
+
+  const picker = element("div", { className: "picker" }, [
+    element("div", { className: "picker-search" }, [search]),
+    list,
+  ]);
+  picker.dataset.statement = String(statement.id);
+  return picker;
+}
+
+/** Rebuilds only the list, so typing in the filter never loses focus. */
+function redrawPicker(statement) {
+  const picker = document.querySelector('.picker[data-statement="' + statement.id + '"]');
+  if (!picker) return;
+  const list = picker.querySelector(".picker-list");
+  list.textContent = "";
+  fillPicker(list, statement);
+}
+
+function fillPicker(list, statement) {
+  const needle = statement.filter.trim().toLowerCase();
+  let shown = 0;
+  for (const service of SERVICES) {
+    const matches = CATALOG.actions.filter(
+      (action) => action.service === service && (!needle || action.name.toLowerCase().includes(needle)),
+    );
+    if (matches.length === 0) continue;
+    shown += matches.length;
+    list.append(element("h4", { textContent: service }));
+    for (const action of matches) {
+      const checkbox = element("input", { type: "checkbox", checked: statement.actions.has(action.name) });
+      checkbox.onchange = () => {
+        if (checkbox.checked) statement.actions.add(action.name);
+        else statement.actions.delete(action.name);
+        realignKind(statement);
+        draw();
+      };
+      list.append(element("label", { className: "action" }, [
+        checkbox,
+        element("span", { className: "name mono", textContent: action.name.split(":")[1] }),
+        element("span", { className: "kind", textContent: KIND_LABEL[action.resources[0]] }),
+      ]));
+    }
+  }
+  if (shown === 0) {
+    list.append(element("p", { className: "empty", textContent: "No action matches “" + statement.filter + "”." }));
+  }
+}
+
+function renderScope(statement) {
+  const shared = suggestedKinds(statement);
+  const select = element("select", { id: "kind-" + statement.id });
+  for (const kind of Object.keys(CATALOG.kinds)) {
+    const suffix = shared.includes(kind) ? "  ✓ matches your actions" : "";
+    select.append(element("option", { value: kind, textContent: KIND_LABEL[kind] + suffix, selected: kind === statement.kind }));
+  }
+  select.onchange = () => { statement.kind = select.value; draw(); };
+
+  const fields = element("div", { className: "fields" }, [
+    element("div", {}, [element("label", { htmlFor: select.id, textContent: "Scope" }), select]),
+  ]);
+
+  for (const field of CATALOG.kinds[statement.kind].fields) {
+    const input = element("input", {
+      type: "text", id: field + "-" + statement.id, value: statement.fields[field] || "",
+      placeholder: "*  (any)", spellcheck: false, autocomplete: "off",
+    });
+    if (live.user && FIELD_LIST[field]) input.setAttribute("list", FIELD_LIST[field]);
+    if (live.user && field === "branch") input.onfocus = () => loadBranches(statement.fields.repository);
+    input.oninput = () => {
+      statement.fields[field] = input.value;
+      const preview = document.getElementById("arn-" + statement.id);
+      if (preview) preview.textContent = resourceOf(statement);
+      render();
+    };
+    fields.append(element("div", {}, [element("label", { htmlFor: input.id, textContent: field }), input]));
+  }
+
+  const preview = element("div", { className: "arn" }, [
+    element("span", { className: "label", textContent: "Resource ARN" }),
+    element("span", { className: "mono", id: "arn-" + statement.id, textContent: resourceOf(statement) }),
+  ]);
+
+  const presets = element("div", { className: "actions-row", style: "margin-top:.45rem" });
+  for (const preset of PRESETS) {
+    const button = element("button", { type: "button", className: "ghost", textContent: "+ " + preset.label });
+    button.onclick = () => {
+      preset.actions.forEach((name) => statement.actions.add(name));
+      realignKind(statement);
+      draw();
+    };
+    presets.append(button);
+  }
+
+  const drawer = element("details", { className: "presets" }, [
+    element("summary", { textContent: "Presets" }),
+    presets,
+  ]);
+  drawer.open = statement.actions.size === 0;
+
+  return element("div", {}, [fields, preview, drawer]);
+}
+
+function renderStatement(statement, index) {
+  const effect = element("div", { className: "segmented" });
+  for (const value of ["allow", "deny"]) {
+    const button = element("button", { type: "button", textContent: value, className: value === "deny" ? "deny" : "" });
+    button.setAttribute("aria-pressed", String(statement.effect === value));
+    button.onclick = () => { statement.effect = value; draw(); };
+    effect.append(button);
+  }
+
+  const remove = element("button", { type: "button", className: "ghost", textContent: "Remove" });
+  remove.onclick = () => { statements = statements.filter((item) => item !== statement); draw(); };
+
+  const count = statement.actions.size;
+  return element("div", { className: "statement" + (statement.effect === "deny" ? " deny" : "") }, [
+    element("div", { className: "statement-head" }, [
+      element("span", { className: "title", textContent: "Statement " + (index + 1) }),
+      effect,
+      element("span", { className: "spacer" }),
+      element("span", { className: "badge", textContent: count === 1 ? "1 action" : count + " actions" }),
+      remove,
+    ]),
+    element("div", { className: "statement-body" }, [
+      element("div", {}, [renderChips(statement), renderPicker(statement)]),
+      renderScope(statement),
+    ]),
+  ]);
+}
+
+function draw() {
+  const host = document.getElementById("statements");
+  host.textContent = "";
+  if (statements.length === 0) {
+    host.append(element("div", { className: "empty-state", textContent: "No statement yet. Add one to start the policy." }));
+  }
+  statements.forEach((statement, index) => host.append(renderStatement(statement, index)));
+  render();
+}
+
+// ------------------------------------------------------------- live data
+// Every call is relative, so the page works unchanged when the server hosts it
+// and degrades to free-text fields when it is opened from the documentation.
+
+function fillList(id, values) {
+  const node = document.getElementById(id);
+  node.textContent = "";
+  for (const value of values) node.append(element("option", { value }));
+}
+
+async function getJson(path) {
+  const response = await fetch(path, { headers: { accept: "application/json" } });
+  if (!response.ok) throw new Error(path + " returned " + response.status);
+  return response.json();
+}
+
+let branchesFor = null;
+async function loadBranches(repository) {
+  if (!live.user || !repository || repository === branchesFor) return;
+  branchesFor = repository;
+  try {
+    const data = await getJson("api/repositories/" + encodeURIComponent(repository) + "/branches");
+    fillList("dl-branches", data.branches);
+  } catch (error) {
+    console.warn(error);
+  }
+}
+
+async function connect() {
+  try {
+    live = await getJson("api/context");
+  } catch {
+    return;
+  }
+  const badge = document.getElementById("mode");
+  if (!live.lakefs) { badge.textContent = "standalone"; return; }
+  if (!live.user) {
+    // The page is served, but the browser carries no lakeFS session. Say so
+    // rather than silently showing empty lists.
+    badge.textContent = "sign in to lakeFS for live names";
+    return;
+  }
+  badge.className = "badge live";
+  badge.textContent = "live as " + live.user;
+
+  // Every list below is what lakeFS lets this user see, and nothing more.
+  try {
+    const names = await getJson("api/names");
+    fillList("dl-users", names.users);
+    fillList("dl-groups", names.groups);
+    fillList("dl-policies", names.policies);
+  } catch (error) { console.warn(error); }
+  try {
+    const data = await getJson("api/repositories");
+    fillList("dl-repositories", data.repositories);
+  } catch (error) { console.warn(error); }
+  draw();
+}
+
+// ------------------------------------------------------------------ boot
+
+function selectTab(name) {
+  tab = name;
+  document.getElementById("tab-yaml").setAttribute("aria-selected", String(name === "yaml"));
+  document.getElementById("tab-json").setAttribute("aria-selected", String(name === "json"));
+  render();
+}
+
+document.getElementById("add-statement").onclick = () => { statements.push(newStatement()); draw(); };
+document.getElementById("reset").onclick = () => { statements = [newStatement()]; draw(); };
+document.getElementById("policy-name").oninput = render;
+document.getElementById("tab-yaml").onclick = () => selectTab("yaml");
+document.getElementById("tab-json").onclick = () => selectTab("json");
+document.getElementById("create").onclick = async (event) => {
+  const button = event.currentTarget;
+  const result = document.getElementById("result");
+  const policy = policyObject();
+  button.disabled = true;
+  button.textContent = "Creating\u2026";
+  result.className = "result";
+  result.textContent = "";
+  try {
+    const response = await fetch("api/policies", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify(policy),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (response.ok) {
+      result.className = "result ok";
+      result.textContent = "Created " + body.name + " in lakeFS.";
+    } else {
+      result.className = "result bad";
+      result.textContent = body.message || ("lakeFS answered " + response.status + ".");
+    }
+  } catch (error) {
+    result.className = "result bad";
+    result.textContent = "The request did not reach the server: " + error.message;
+  }
+  button.textContent = "Create in lakeFS";
+  render();
+};
+
+document.getElementById("copy").onclick = async (event) => {
+  const button = event.currentTarget;
+  try {
+    await navigator.clipboard.writeText(document.getElementById("output").textContent);
+    button.textContent = "Copied";
+  } catch {
+    button.textContent = "Press ⌘C";
+  }
+  setTimeout(() => { button.textContent = "Copy"; }, 1500);
+};
+
+statements.push(newStatement());
+draw();
+connect();
+</script>
+</body>
+</html>

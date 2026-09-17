@@ -1,0 +1,1 @@
+--8<-- "crates/lakefs-authz/README.md"

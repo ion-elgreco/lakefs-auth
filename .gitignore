@@ -1,0 +1,8 @@
+/target
+**/*.rs.bk
+.env
+*.log
+/deploy/docker/staging
+/dist
+/site
+.zed
