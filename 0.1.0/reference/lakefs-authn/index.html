@@ -1,0 +1,1276 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Authentication and authorization servers for open-source lakeFS">
+      
+      
+      
+        <link rel="canonical" href="https://ion-elgreco.github.io/lakefs-auth/0.1.0/reference/lakefs-authn/">
+      
+      
+        <link rel="prev" href="../../authn-flows/">
+      
+      
+        <link rel="next" href="../lakefs-authz/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.62">
+    
+    
+      
+        <title>lakefs-authn - lakefs-auth</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.ce62732f.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.812a03bb.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#lakefs-authn" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lakefs-auth" class="md-header__button md-logo" aria-label="lakefs-auth" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lakefs-auth
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              lakefs-authn
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/ion-elgreco/lakefs-auth" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lakefs-auth
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lakefs-auth" class="md-nav__button md-logo" aria-label="lakefs-auth" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    lakefs-auth
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ion-elgreco/lakefs-auth" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lakefs-auth
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../installation/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Installation
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Installation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/secrets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Secrets
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Docker
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/helm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Helm
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/bootstrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Bootstrap file
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Container images
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Tools
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Tools
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/policy-builder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Policy builder
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../authn-flows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Authentication flows
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Reference
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  lakefs-authn
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  lakefs-authn
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-a-login-becomes-a-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How a login becomes a user
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lakefs-authz/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  lakefs-authz
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-a-login-becomes-a-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How a login becomes a user
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="lakefs-authn">lakefs-authn<a class="headerlink" href="#lakefs-authn" title="Permanent link">&para;</a></h1>
+<p>The lakeFS authentication server. It implements <code>api/authentication.yml</code> of lakeFS and turns an OIDC login into a
+lakeFS session, for browsers through <code>/oidc/login</code> and for the lakeFS SDKs through the token login. The
+<a href="https://ion-elgreco.github.io/lakefs-auth/latest/authn-flows/">authentication flows</a> page shows how each login
+works.</p>
+<p>The <a href="https://ion-elgreco.github.io/lakefs-auth/latest/installation/">Installation</a> pages show how to run it with Docker Compose or Helm.</p>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<p>Every flag has a <code>LAKEFS_AUTHN_*</code> environment variable. Boolean flags take an explicit value, so
+<code>LAKEFS_AUTHN_GROUP_MAP_STRICT=false</code> works.</p>
+<details class="note">
+<summary>Server</summary>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Environment variable</th>
+<th>Default</th>
+<th>Comment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--listen</code></td>
+<td><code>LAKEFS_AUTHN_LISTEN</code></td>
+<td><code>0.0.0.0:8001</code></td>
+<td>Address the server binds to.</td>
+</tr>
+<tr>
+<td><code>--public-url</code></td>
+<td><code>LAKEFS_AUTHN_PUBLIC_URL</code></td>
+<td>required</td>
+<td>External base URL of this server. The redirect URI is <code>&lt;public-url&gt;/oidc/callback</code>, and an <code>https</code> scheme makes the cookie <code>Secure</code>.</td>
+</tr>
+<tr>
+<td><code>--api-base-path</code></td>
+<td><code>LAKEFS_AUTHN_API_BASE_PATH</code></td>
+<td><code>/api/v1</code></td>
+<td>Path prefix of the lakeFS authentication API routes. Must match the suffix of lakeFS <code>auth.authentication_api.endpoint</code>.</td>
+</tr>
+<tr>
+<td><code>--request-timeout</code></td>
+<td><code>LAKEFS_AUTHN_REQUEST_TIMEOUT</code></td>
+<td><code>30s</code></td>
+<td>Server-side ceiling per request, so a hung identity provider or authorization server cannot pin a connection.</td>
+</tr>
+<tr>
+<td><code>--metrics-listen</code></td>
+<td><code>LAKEFS_AUTHN_METRICS_LISTEN</code></td>
+<td>unset</td>
+<td>Address for the Prometheus <code>/metrics</code> endpoint, for example <code>0.0.0.0:9090</code>. Unset keeps it off.</td>
+</tr>
+<tr>
+<td><code>--log-level</code></td>
+<td><code>LAKEFS_AUTHN_LOG_LEVEL</code></td>
+<td><code>info</code></td>
+<td><code>error</code>, <code>warn</code>, <code>info</code>, <code>debug</code>, or <code>trace</code>.</td>
+</tr>
+<tr>
+<td><code>--log-format</code></td>
+<td><code>LAKEFS_AUTHN_LOG_FORMAT</code></td>
+<td><code>text</code></td>
+<td><code>text</code> for people, <code>json</code> for log pipelines.</td>
+</tr>
+</tbody>
+</table>
+</details>
+<details class="note">
+<summary>lakeFS and lakefs-authz</summary>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Environment variable</th>
+<th>Default</th>
+<th>Comment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--secret-key</code></td>
+<td><code>LAKEFS_AUTHN_SECRET_KEY</code></td>
+<td>required</td>
+<td>The lakeFS <code>auth.encrypt.secret_key</code>. Signs the session cookie and the login token.</td>
+</tr>
+<tr>
+<td><code>--authz-url</code></td>
+<td><code>LAKEFS_AUTHN_AUTHZ_URL</code></td>
+<td>required</td>
+<td>Base URL of lakefs-authz, including <code>/api/v1</code>.</td>
+</tr>
+<tr>
+<td><code>--authz-token</code></td>
+<td><code>LAKEFS_AUTHN_AUTHZ_TOKEN</code></td>
+<td>none</td>
+<td>Static bearer token for lakefs-authz, the same value as its <code>--api-token</code>. Without it the server mints the lakeFS internal token from the shared secret.</td>
+</tr>
+</tbody>
+</table>
+</details>
+<details class="note">
+<summary>Identity provider</summary>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Environment variable</th>
+<th>Default</th>
+<th>Comment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--oidc-issuer</code></td>
+<td><code>LAKEFS_AUTHN_OIDC_ISSUER</code></td>
+<td>required</td>
+<td>Issuer URL. Discovery appends <code>/.well-known/openid-configuration</code> and compares the advertised issuer byte for byte.</td>
+</tr>
+<tr>
+<td><code>--oidc-client-id</code></td>
+<td><code>LAKEFS_AUTHN_OIDC_CLIENT_ID</code></td>
+<td>required</td>
+<td>Client id registered at the identity provider.</td>
+</tr>
+<tr>
+<td><code>--oidc-client-secret</code></td>
+<td><code>LAKEFS_AUTHN_OIDC_CLIENT_SECRET</code></td>
+<td>none</td>
+<td>Client secret. Leave it unset for a public client.</td>
+</tr>
+<tr>
+<td><code>--oidc-client-secret-file</code></td>
+<td><code>LAKEFS_AUTHN_OIDC_CLIENT_SECRET_FILE</code></td>
+<td>none</td>
+<td>File with the client secret, read at startup when <code>--oidc-client-secret</code> is unset. For mounted secrets.</td>
+</tr>
+<tr>
+<td><code>--oidc-scopes</code></td>
+<td><code>LAKEFS_AUTHN_OIDC_SCOPES</code></td>
+<td><code>openid,profile,email</code></td>
+<td>Scopes requested at login. Add the scope that carries the groups claim when you use one.</td>
+</tr>
+<tr>
+<td><code>--oidc-validate-claims</code></td>
+<td><code>LAKEFS_AUTHN_OIDC_VALIDATE_CLAIMS</code></td>
+<td>empty</td>
+<td>Claims that must match before a login is accepted, as <code>key=value,key=value</code>, for example <code>hd=example.com</code>. The value is compared exactly against the flattened claim, so an array matches as <code>a,b</code>; an item without <code>=</code> continues the value before it, so <code>aud=lakefs,other</code> expects the array <code>["lakefs", "other"]</code>.</td>
+</tr>
+<tr>
+<td><code>--discovery-refresh-interval</code></td>
+<td><code>LAKEFS_AUTHN_DISCOVERY_REFRESH_INTERVAL</code></td>
+<td><code>1h</code></td>
+<td>How often the provider metadata and signing keys are refreshed.</td>
+</tr>
+<tr>
+<td><code>--discovery-min-refresh-interval</code></td>
+<td><code>LAKEFS_AUTHN_DISCOVERY_MIN_REFRESH_INTERVAL</code></td>
+<td><code>60s</code></td>
+<td>Shortest gap between two refreshes triggered by an unknown signing key.</td>
+</tr>
+<tr>
+<td><code>--discovery-timeout</code></td>
+<td><code>LAKEFS_AUTHN_DISCOVERY_TIMEOUT</code></td>
+<td><code>10s</code></td>
+<td>Timeout of one request to the identity provider: discovery, the JWKS, and the authorization code exchange.</td>
+</tr>
+</tbody>
+</table>
+</details>
+<details class="note">
+<summary>Users and groups</summary>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Environment variable</th>
+<th>Default</th>
+<th>Comment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--username-claim</code></td>
+<td><code>LAKEFS_AUTHN_USERNAME_CLAIM</code></td>
+<td><code>preferred_username,email,sub</code></td>
+<td>Claims tried in order for the lakeFS username of a new user.</td>
+</tr>
+<tr>
+<td><code>--friendly-name-claim</code></td>
+<td><code>LAKEFS_AUTHN_FRIENDLY_NAME_CLAIM</code></td>
+<td><code>name</code></td>
+<td>Claim used as the display name.</td>
+</tr>
+<tr>
+<td><code>--persist-friendly-name</code></td>
+<td><code>LAKEFS_AUTHN_PERSIST_FRIENDLY_NAME</code></td>
+<td><code>true</code></td>
+<td>Stores the display name in lakefs-authz and refreshes it at every login.</td>
+</tr>
+<tr>
+<td><code>--auth-source</code></td>
+<td><code>LAKEFS_AUTHN_AUTH_SOURCE</code></td>
+<td><code>oidc</code></td>
+<td>Value stored as the <code>source</code> of the users this server creates.</td>
+</tr>
+<tr>
+<td><code>--auto-provision</code></td>
+<td><code>LAKEFS_AUTHN_AUTO_PROVISION</code></td>
+<td><code>true</code></td>
+<td>Creates a lakeFS user at the first login of an unknown identity. With <code>false</code> only users that already exist can sign in, for example the ones a bootstrap file creates with their <code>external_id</code>.</td>
+</tr>
+<tr>
+<td><code>--initial-groups</code></td>
+<td><code>LAKEFS_AUTHN_INITIAL_GROUPS</code></td>
+<td><code>Developers</code></td>
+<td>Groups a new user joins when no groups claim resolves. They must exist in lakefs-authz.</td>
+</tr>
+<tr>
+<td><code>--groups-claim</code></td>
+<td><code>LAKEFS_AUTHN_GROUPS_CLAIM</code></td>
+<td>none</td>
+<td>Claim that lists the user's groups, as a string list or a comma separated string.</td>
+</tr>
+<tr>
+<td><code>--group-map</code></td>
+<td><code>LAKEFS_AUTHN_GROUP_MAP</code></td>
+<td>empty</td>
+<td>Renames provider groups to lakeFS groups, as <code>idp-name=lakefs-name,...</code>.</td>
+</tr>
+<tr>
+<td><code>--group-map-strict</code></td>
+<td><code>LAKEFS_AUTHN_GROUP_MAP_STRICT</code></td>
+<td><code>true</code></td>
+<td>Drops groups that the map does not mention; when none is left the user joins no group. With <code>false</code>, unmapped groups keep their provider name.</td>
+</tr>
+</tbody>
+</table>
+</details>
+<details class="note">
+<summary>Browser session</summary>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Environment variable</th>
+<th>Default</th>
+<th>Comment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--session-ttl</code></td>
+<td><code>LAKEFS_AUTHN_SESSION_TTL</code></td>
+<td><code>168h</code></td>
+<td>Lifetime of the session cookie. The cookie format caps it at 30 days.</td>
+</tr>
+<tr>
+<td><code>--cookie-secure</code></td>
+<td><code>LAKEFS_AUTHN_COOKIE_SECURE</code></td>
+<td>from <code>--public-url</code></td>
+<td><code>true</code> when the public URL uses <code>https</code>. Set it only to override that.</td>
+</tr>
+<tr>
+<td><code>--cookie-domain</code></td>
+<td><code>LAKEFS_AUTHN_COOKIE_DOMAIN</code></td>
+<td>none</td>
+<td><code>Domain</code> attribute of the session cookie, for a cookie shared across subdomains.</td>
+</tr>
+<tr>
+<td><code>--post-login-redirect-url</code></td>
+<td><code>LAKEFS_AUTHN_POST_LOGIN_REDIRECT_URL</code></td>
+<td><code>/</code></td>
+<td>Where the browser goes after login when <code>next</code> is absent. A relative <code>next</code> is resolved against it, so use the absolute lakeFS URL when lakeFS is on another origin.</td>
+</tr>
+<tr>
+<td><code>--post-logout-redirect-url</code></td>
+<td><code>LAKEFS_AUTHN_POST_LOGOUT_REDIRECT_URL</code></td>
+<td><code>/auth/login</code></td>
+<td>Where the browser goes after logout.</td>
+</tr>
+<tr>
+<td><code>--allowed-redirect-hosts</code></td>
+<td><code>LAKEFS_AUTHN_ALLOWED_REDIRECT_HOSTS</code></td>
+<td>empty</td>
+<td>Origins that an absolute <code>next</code> URL may point at, as <code>host</code>, <code>host:port</code>, or <code>scheme://host[:port]</code>. A bare host matches the default port only. Relative paths are always allowed.</td>
+</tr>
+<tr>
+<td><code>--rp-initiated-logout</code></td>
+<td><code>LAKEFS_AUTHN_RP_INITIATED_LOGOUT</code></td>
+<td><code>false</code></td>
+<td>Sends the browser to the provider <code>end_session_endpoint</code> on logout, so the provider session ends too.</td>
+</tr>
+</tbody>
+</table>
+</details>
+<details class="note">
+<summary>SDK login</summary>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Environment variable</th>
+<th>Default</th>
+<th>Comment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--state-is-pkce-verifier</code></td>
+<td><code>LAKEFS_AUTHN_STATE_IS_PKCE_VERIFIER</code></td>
+<td><code>true</code></td>
+<td>For the SDK login: the lakeFS client sends the PKCE verifier in <code>state</code>.</td>
+</tr>
+<tr>
+<td><code>--sts-allowed-redirect-uris</code></td>
+<td><code>LAKEFS_AUTHN_STS_ALLOWED_REDIRECT_URIS</code></td>
+<td>empty</td>
+<td>Allow list for the <code>redirect_uri</code> of the SDK login. Empty refuses every SDK login. A loopback entry without a port, such as <code>http://127.0.0.1/callback</code>, matches any port; other entries match exactly.</td>
+</tr>
+</tbody>
+</table>
+</details>
+<h2 id="how-a-login-becomes-a-user">How a login becomes a user<a class="headerlink" href="#how-a-login-becomes-a-user" title="Permanent link">&para;</a></h2>
+<p>A login identifies a lakeFS user by the <code>sub</code> claim of the ID token. The first login creates that user with a
+username from <code>--username-claim</code> and puts it in <code>--initial-groups</code>, which must already exist in lakefs-authz.
+Later logins do not sync the user again, so a group you change in lakeFS stays as you set it.</p>
+<p>Set <code>--groups-claim</code> to take the groups from the identity provider instead, and <code>--group-map</code> to rename them
+to lakeFS group names. Set <code>--auto-provision false</code> to create no users at all; then every user needs an entry
+with an <code>external_id</code> in the lakefs-authz bootstrap file.</p>
+<p>The <a href="https://ion-elgreco.github.io/lakefs-auth/latest/authn-flows/">authentication flows</a> page shows the
+sequence and the edge cases.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","content.code.annotate","navigation.expand","navigation.indexes","search.highlight","search.share","toc.follow","navigation.top"],"redirect":null,"search":"../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.8dcc8e9c.min.js"></script>
+      
+    
+  </body>
+</html>
