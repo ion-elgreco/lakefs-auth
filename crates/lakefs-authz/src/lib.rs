@@ -27,12 +27,12 @@
 
 pub mod app;
 pub mod bootstrap;
-pub mod policy_builder;
 pub mod cleanup;
 pub mod config;
 pub mod handlers;
 pub mod lakefs;
 pub mod metrics;
+pub mod policy_builder;
 pub mod routes;
 pub mod service;
 pub mod store;

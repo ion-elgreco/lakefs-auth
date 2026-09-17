@@ -11,9 +11,9 @@ use lakefs_auth_core::tasks::supervise;
 use lakefs_auth_core::telemetry::init_tracing;
 use lakefs_authz::app::{AppState, build_router, serve};
 use lakefs_authz::bootstrap;
-use lakefs_authz::policy_builder::{BuilderState, serve_builder};
 use lakefs_authz::cleanup::cleanup_token_ids;
 use lakefs_authz::config::Config;
+use lakefs_authz::policy_builder::{BuilderState, serve_builder};
 use lakefs_authz::store::{AdminStore as _, PgStore, Store};
 
 /// How often the database pool gauges are refreshed. Fast enough to catch a
