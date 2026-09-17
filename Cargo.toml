@@ -32,7 +32,7 @@ serde_urlencoded = "0.7"
 # security
 jsonwebtoken = { version = "11", features = ["rust_crypto"] }
 # `zeroize` wipes the expanded round keys when a cipher is dropped
-aes-gcm = { version = "0.10", features = ["zeroize"] }
+aes-gcm = { version = "0.11", features = ["zeroize"] }
 hkdf = "0.12"
 hmac = "0.12"
 sha2 = "0.10"
