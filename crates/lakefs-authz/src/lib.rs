@@ -27,7 +27,7 @@
 
 pub mod app;
 pub mod bootstrap;
-pub mod builder;
+pub mod policy_builder;
 pub mod cleanup;
 pub mod config;
 pub mod handlers;

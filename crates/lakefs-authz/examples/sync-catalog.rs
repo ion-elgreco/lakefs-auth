@@ -3,7 +3,7 @@
 //! The page carries the catalog so that it also works when it is opened from
 //! the documentation, with no server behind it. This example is what keeps that
 //! copy honest: run `just sync-catalog` after the catalog changes. A test in
-//! `lakefs_authz::builder` fails while the copy is stale.
+//! `lakefs_authz::policy_builder` fails while the copy is stale.
 
 use std::path::Path;
 
