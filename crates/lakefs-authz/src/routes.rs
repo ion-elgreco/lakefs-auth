@@ -1,8 +1,9 @@
 //! The route table and the router.
 //!
-//! [`ROUTE_TABLE`] lists every operation of `api/authorization.yml` relative to
-//! the base path, in the OpenAPI path syntax, which axum 0.8 shares. A test
-//! compares it with the vendored specification.
+//! With the `testkit` feature, `ROUTE_TABLE` lists every operation of
+//! `api/authorization.yml` relative to the base path, in the OpenAPI path
+//! syntax, which axum 0.8 shares. A test compares it with the vendored
+//! specification.
 
 use axum::Router;
 use axum::routing::{get, post, put};
@@ -11,6 +12,10 @@ use crate::app::AppState;
 use crate::handlers::{attachments, credentials, external, groups, memberships, meta, policies, tokenid, users};
 
 /// Method and path of all 37 operations, relative to `--base-path`.
+///
+/// Only the tests read this, so it is behind `testkit` and stays out of the
+/// public API of the release build.
+#[cfg(feature = "testkit")]
 pub const ROUTE_TABLE: &[(&str, &str)] = &[
     ("GET", "/auth/users"),
     ("POST", "/auth/users"),
@@ -133,6 +138,7 @@ mod tests {
     use super::*;
     use std::collections::BTreeSet;
 
+    #[cfg(feature = "testkit")]
     #[test]
     fn the_route_table_has_all_37_operations_once() {
         let unique: BTreeSet<_> = ROUTE_TABLE.iter().collect();
