@@ -14,6 +14,7 @@ use std::time::Instant;
 
 use axum::Router;
 use axum::extract::{MatchedPath, Request};
+use axum::http::Method;
 use axum::middleware::Next;
 use axum::response::Response;
 use axum::routing::get;
@@ -102,17 +103,17 @@ pub async fn track_http(request: Request, next: Next) -> Response {
     response
 }
 
-fn method_label(method: &axum::http::Method) -> &'static str {
-    match method.as_str() {
-        "GET" => "GET",
-        "HEAD" => "HEAD",
-        "POST" => "POST",
-        "PUT" => "PUT",
-        "DELETE" => "DELETE",
-        "OPTIONS" => "OPTIONS",
-        "PATCH" => "PATCH",
-        "TRACE" => "TRACE",
-        "CONNECT" => "CONNECT",
+fn method_label(method: &Method) -> &'static str {
+    match *method {
+        Method::GET => "GET",
+        Method::HEAD => "HEAD",
+        Method::POST => "POST",
+        Method::PUT => "PUT",
+        Method::DELETE => "DELETE",
+        Method::OPTIONS => "OPTIONS",
+        Method::PATCH => "PATCH",
+        Method::TRACE => "TRACE",
+        Method::CONNECT => "CONNECT",
         _ => OTHER_METHOD,
     }
 }
