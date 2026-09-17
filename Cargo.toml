@@ -34,7 +34,7 @@ jsonwebtoken = { version = "11", features = ["rust_crypto"] }
 # `zeroize` wipes the expanded round keys when a cipher is dropped
 aes-gcm = { version = "0.10", features = ["zeroize"] }
 hkdf = "0.12"
-hmac = "0.12"
+hmac = "0.13"
 sha2 = "0.10"
 subtle = "2"
 rand = "0.10"
