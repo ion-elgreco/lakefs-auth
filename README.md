@@ -2,6 +2,12 @@
 
 [Documentation](https://ion-elgreco.github.io/lakefs-auth/) · [Issues](https://github.com/ion-elgreco/lakefs-auth/issues)
 
+> [!WARNING]
+> lakefs-auth works with lakeFS up to and including 1.86.0. lakeFS 1.87.0 removed the authentication and authorization
+> APIs that these servers implement ([treeverse/lakeFS#10532](https://github.com/treeverse/lakeFS/pull/10532)).
+> From 1.87.0, lakeFS no longer calls lakefs-authn or lakefs-authz, so SSO, RBAC, and the access keys stored in
+> lakefs-authz stop working.
+
 Two Rust servers that give open-source [lakeFS](https://lakefs.io) multi-user RBAC and OIDC single sign-on:
 
 - **lakefs-authz** implements the lakeFS authorization API (`api/authorization.yml`). It stores users, groups,
